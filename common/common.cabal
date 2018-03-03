@@ -16,8 +16,12 @@ cabal-version:       >=1.10
 
 library
   ghc-options:         -Wall -O2
-  exposed-modules:     Lib
+  exposed-modules:     Taut.Slack.Types
+  other-modules:       Taut.Slack.Internal
   -- other-extensions:    
   build-depends:       base >=4.9 && <4.11
+                     , aeson
+                     , casing
+                     , text
   hs-source-dirs:      src
   default-language:    Haskell2010
