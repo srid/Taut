@@ -5,7 +5,7 @@ name:                common
 version:             0.1.0.0
 -- synopsis:            
 -- description:         
-license:             OtherLicense
+license:             BSD3
 license-file:        LICENSE
 author:              Will Fancher
 maintainer:          elvishjerricco@gmail.com
