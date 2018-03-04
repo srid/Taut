@@ -3,7 +3,6 @@
 module Taut.Slack.Internal (fieldLabelMod) where
 
 import Data.Aeson
-import Data.Aeson.Types
 import Data.List (elemIndices)
 import Text.Casing (fromHumps, toQuietSnake)
 

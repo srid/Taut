@@ -3,6 +3,7 @@
 
 module Taut.Slack.Types where
 
+import Data.Time (UTCTime)
 import Data.Aeson
 import Data.Text (Text)
 import GHC.Generics
@@ -33,14 +34,34 @@ data UserProfile = UserProfile
 
 data Channel = Channel
   { _channel_id :: Text
+  , _channel_name :: Text
+  , _channel_created :: Text -- Uh
   }
+  deriving (Eq, Generic, Show)
+
+data Message = Message
+  { _message_type :: Text
+  , _message_user :: Text -- Join with User ID
+  , _message_text :: Text
+  , _message_clientMsgId :: Maybe Text -- XXX: maybe
+  , _message_ts :: Text -- Timestamp, I think
+  }
+  deriving (Eq, Generic, Show)
 
 instance FromJSON User where
   parseJSON = genericParseJSON fieldLabelMod
 instance FromJSON UserProfile where
   parseJSON = genericParseJSON fieldLabelMod
+instance FromJSON Channel where
+  parseJSON = genericParseJSON fieldLabelMod
+instance FromJSON Message where
+  parseJSON = genericParseJSON fieldLabelMod
 
 instance ToJSON User where
   toJSON = genericToJSON fieldLabelMod
 instance ToJSON UserProfile where
+  toJSON = genericToJSON fieldLabelMod
+instance ToJSON Channel where
+  toJSON = genericToJSON fieldLabelMod
+instance ToJSON Message where
   toJSON = genericToJSON fieldLabelMod
