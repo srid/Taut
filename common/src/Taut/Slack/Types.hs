@@ -40,9 +40,9 @@ data UserProfile = UserProfile
   deriving (Eq, Generic, Show)
 
 data ChannelT f = Channel
-  { _channel_id :: Columnar f Text
-  , _channel_name :: Columnar f Text
-  , _channel_created :: Columnar f Text -- Uh
+  { _channelId :: Columnar f Text
+  , _channelName :: Columnar f Text
+  , _channelCreated :: Columnar f Text -- Uh
   }
   deriving (Generic)
 
@@ -55,7 +55,7 @@ deriving instance Eq Channel
 
 instance Table ChannelT where
   data PrimaryKey ChannelT f = ChannelId (Columnar f Text) deriving Generic
-  primaryKey = ChannelId . _channel_id
+  primaryKey = ChannelId . _channelId
 instance Beamable (PrimaryKey ChannelT)
 
 data Message = Message

@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeSynonymInstances #-}
@@ -13,6 +14,8 @@ import qualified Data.ByteString.Lazy as B
 import Data.Monoid ((<>))
 
 import Database.Beam
+import Database.Beam.Sqlite ()
+import Database.SQLite.Simple (open)
 
 import Taut.Slack.Types
 
@@ -20,7 +23,7 @@ rootDir :: String
 rootDir = "/home/srid/tmp/data"
 
 data SlackDb f = SlackDb
-  { _slackDb_channels :: f (TableEntity ChannelT)
+  { _slackChannels :: f (TableEntity ChannelT)
   }
   deriving (Generic)
 
@@ -39,5 +42,13 @@ loadUsers = do
 
 main :: IO ()
 main = do
-  -- (loadFile "/channels.json" :: IO (Either String [Channel])) >>= putStrLn . show
-  (loadFile "/general/2018-02-15.json" :: IO (Either String [Message])) >>= putStrLn . show
+  (Right channels) <- loadFile "/channels.json" :: IO (Either String [Channel])
+  -- (Right channels) <- loadFile "/general/2018-02-15.json" :: IO (Either String [Message])
+
+  putStrLn . show $ channels
+
+  conn <- open "/tmp/slack1.db"
+  withDatabaseDebug putStrLn conn $ do
+    runInsert $
+      insert (_slackChannels slackDb) $
+      insertValues channels

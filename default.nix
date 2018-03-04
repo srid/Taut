@@ -28,8 +28,8 @@
     beam = pkgs.fetchFromGitHub {
       owner = "tathougies";
       repo = "beam";
-      rev = "1673f0762f9beca04923518bca1ba5c519fd56a3";
-      sha256 = "0l1zs64n736gkrz3bs0ws6lq4kjig32przdmnjigk40rs3mly32k";
+      rev = "a3b5e0763843fed48c7eef53fa7d08cfe710342d";
+      sha256 = "15w4rqwj3wpssah6664pwvlh6lvv7pv4xa9v81kj3p1vx74lx9ps";
     };
   in
   {

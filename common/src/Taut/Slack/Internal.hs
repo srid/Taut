@@ -3,17 +3,11 @@
 module Taut.Slack.Internal (fieldLabelMod) where
 
 import Data.Aeson
-import Data.List (elemIndices)
+import Data.Char (isUpper)
 import Text.Casing (fromHumps, toQuietSnake)
 
 -- | Field label modifier for converting Slack datatypes to json
 fieldLabelMod :: Options
 fieldLabelMod = defaultOptions
-  { fieldLabelModifier = toQuietSnake . fromHumps . stripRecordPrefix
+  { fieldLabelModifier = toQuietSnake . fromHumps . dropWhile (not . isUpper)
   }
-
--- XXX: This will runtime error out unless the field name is of the format `_{recordName}_{fieldName}`
--- Ideally we should figure out a way to enforce this constraint in the compiler.
-stripRecordPrefix :: String -> String
-stripRecordPrefix s = drop n s
-  where n = 1 + (elemIndices '_' s !! 1)
