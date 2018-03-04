@@ -18,24 +18,25 @@ import Database.Beam
 import Taut.Slack.Internal
 
 data User = User
-  { _user_id :: Text
-  , _user_teamId :: Text
-  , _user_name :: Text
-  , _user_deleted :: Bool
-  , _user_color :: Maybe Text
-  , _user_realName :: Maybe Text
-  , _user_tz :: Maybe Text
-  , _user_tzLabel :: Maybe Text
-  , _user_tzOffset :: Maybe Int
-  , _user_profile :: UserProfile
+  { _userId :: Text
+  , _userTeamId :: Text
+  , _username :: Text
+  , _userDeleted :: Bool
+  , _userColor :: Maybe Text
+  , _userRealName :: Maybe Text
+  , _userTz :: Maybe Text
+  , _userTzLabel :: Maybe Text
+  , _userTzOffset :: Maybe Int
+  , _userProfile :: Profile
   }
   deriving (Eq, Generic, Show)
 
 -- TODO: Image links
-data UserProfile = UserProfile
-  { _userProfile_title :: Text
-  , _userProfile_avatarHash :: Text
-  , _userProfile_team :: Text
+-- FIXME: json parser would fail here. argh
+data Profile = Profile
+  { _profileTitle :: Text
+  , _profileAvatarHash :: Text
+  , _profileTeam :: Text
   }
   deriving (Eq, Generic, Show)
 
@@ -59,17 +60,17 @@ instance Table ChannelT where
 instance Beamable (PrimaryKey ChannelT)
 
 data Message = Message
-  { _message_type :: Text
-  , _message_user :: Text -- Join with User ID
-  , _message_text :: Text
-  , _message_clientMsgId :: Maybe Text -- XXX: maybe
-  , _message_ts :: Text -- Timestamp, I think
+  { _messageType :: Text
+  , _messageUser :: Text -- Join with User ID
+  , _messageText :: Text
+  , _messageClientMsgId :: Maybe Text -- XXX: maybe
+  , _messageTs :: Text -- Timestamp, I think
   }
   deriving (Eq, Generic, Show)
 
 instance FromJSON User where
   parseJSON = genericParseJSON fieldLabelMod
-instance FromJSON UserProfile where
+instance FromJSON Profile where
   parseJSON = genericParseJSON fieldLabelMod
 instance FromJSON Channel where
   parseJSON = genericParseJSON fieldLabelMod
@@ -78,7 +79,7 @@ instance FromJSON Message where
 
 instance ToJSON User where
   toJSON = genericToJSON fieldLabelMod
-instance ToJSON UserProfile where
+instance ToJSON Profile where
   toJSON = genericToJSON fieldLabelMod
 instance ToJSON Channel where
   toJSON = genericToJSON fieldLabelMod

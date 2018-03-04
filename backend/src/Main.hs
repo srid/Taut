@@ -9,13 +9,15 @@
 
 module Main where
 
+import Control.Monad
 import Data.Aeson
 import qualified Data.ByteString.Lazy as B
 import Data.Monoid ((<>))
+import System.Directory
 
 import Database.Beam
 import Database.Beam.Sqlite ()
-import Database.SQLite.Simple (open)
+import qualified Database.SQLite.Simple as SQLite
 
 import Taut.Slack.Types
 
@@ -47,8 +49,14 @@ main = do
 
   putStrLn . show $ channels
 
-  conn <- open "/tmp/slack1.db"
-  withDatabaseDebug putStrLn conn $ do
-    runInsert $
-      insert (_slackChannels slackDb) $
-      insertValues channels
+  let dbFile = rootDir <> "slack.db"
+
+  doesFileExist dbFile >>= flip when (removeFile dbFile)
+
+  SQLite.withConnection dbFile $ \conn -> do
+    SQLite.execute_ conn "CREATE TABLE channels (id VARCHAR NOT NULL, name VARCHAR NOT NULL, created VARCHAR NOT NULL, PRIMARY KEY( id ));"
+
+    withDatabaseDebug putStrLn conn $ do
+      runInsert $
+        insert (_slackChannels slackDb) $
+        insertValues channels
