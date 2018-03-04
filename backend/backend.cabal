@@ -21,6 +21,8 @@ executable backend
   -- other-extensions:    
   build-depends:       base >=4.9 && <4.11
                      , aeson
+                     , beam-core
+                     , beam-sqlite
                      , bytestring
                      , common
   hs-source-dirs:      src
