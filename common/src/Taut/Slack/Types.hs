@@ -1,12 +1,19 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
+
 
 module Taut.Slack.Types where
 
-import Data.Time (UTCTime)
 import Data.Aeson
 import Data.Text (Text)
-import GHC.Generics
+import Data.Time (UTCTime)
+
+import Database.Beam
 
 import Taut.Slack.Internal
 
@@ -32,12 +39,24 @@ data UserProfile = UserProfile
   }
   deriving (Eq, Generic, Show)
 
-data Channel = Channel
-  { _channel_id :: Text
-  , _channel_name :: Text
-  , _channel_created :: Text -- Uh
+data ChannelT f = Channel
+  { _channel_id :: Columnar f Text
+  , _channel_name :: Columnar f Text
+  , _channel_created :: Columnar f Text -- Uh
   }
-  deriving (Eq, Generic, Show)
+  deriving (Generic)
+
+type Channel = ChannelT Identity
+type ChannelId = PrimaryKey ChannelT Identity
+
+instance Beamable ChannelT
+deriving instance Show Channel
+deriving instance Eq Channel
+
+instance Table ChannelT where
+  data PrimaryKey ChannelT f = ChannelId (Columnar f Text) deriving Generic
+  primaryKey = ChannelId . _channel_id
+instance Beamable (PrimaryKey ChannelT)
 
 data Message = Message
   { _message_type :: Text
