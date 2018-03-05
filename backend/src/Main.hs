@@ -26,6 +26,7 @@ rootDir = "/home/srid/tmp/data"
 
 data SlackDb f = SlackDb
   { _slackChannels :: f (TableEntity ChannelT)
+  , _slackUsers :: f (TableEntity UserT)
   }
   deriving (Generic)
 
@@ -44,10 +45,10 @@ loadUsers = do
 
 main :: IO ()
 main = do
+  -- TODO: other types
+  (Right users) <- loadFile "/users.json" :: IO (Either String [User])
   (Right channels) <- loadFile "/channels.json" :: IO (Either String [Channel])
   -- (Right channels) <- loadFile "/general/2018-02-15.json" :: IO (Either String [Message])
-
-  putStrLn . show $ channels
 
   let dbFile = rootDir <> "slack.db"
 
@@ -55,8 +56,12 @@ main = do
 
   SQLite.withConnection dbFile $ \conn -> do
     SQLite.execute_ conn "CREATE TABLE channels (id VARCHAR NOT NULL, name VARCHAR NOT NULL, created VARCHAR NOT NULL, PRIMARY KEY( id ));"
+    SQLite.execute_ conn "CREATE TABLE users (id VARCHAR NOT NULL, team_id VARCHAR NOT NULL, name VARCHAR NOT NULL, deleted BOOL NOT NULL, color VARCHAR, real_name VARCHAR, tz VARCHAR, tz_label VARCHAR, tz_offset INTEGER, PRIMARY KEY( id ));"
 
     withDatabaseDebug putStrLn conn $ do
+      runInsert $
+        insert (_slackUsers slackDb) $
+        insertValues users
       runInsert $
         insert (_slackChannels slackDb) $
         insertValues channels

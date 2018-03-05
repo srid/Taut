@@ -17,19 +17,32 @@ import Database.Beam
 
 import Taut.Slack.Internal
 
-data User = User
-  { _userId :: Text
-  , _userTeamId :: Text
-  , _username :: Text
-  , _userDeleted :: Bool
-  , _userColor :: Maybe Text
-  , _userRealName :: Maybe Text
-  , _userTz :: Maybe Text
-  , _userTzLabel :: Maybe Text
-  , _userTzOffset :: Maybe Int
-  , _userProfile :: Profile
+data UserT f = User
+  { _userId :: Columnar f Text
+  , _userTeamId :: Columnar f Text
+  , _userName :: Columnar f Text
+  , _userDeleted :: Columnar f Bool
+  , _userColor :: Columnar f (Maybe Text)
+  , _userRealName :: Columnar f (Maybe Text)
+  , _userTz :: Columnar f (Maybe Text)
+  , _userTzLabel :: Columnar f (Maybe Text)
+  , _userTzOffset :: Columnar f (Maybe Int)
+  -- , _userProfile :: Columnar f Profile
   }
-  deriving (Eq, Generic, Show)
+  deriving (Generic)
+-- TODO: How to model profile in database?
+
+type User = UserT Identity
+type UserId = PrimaryKey UserT Identity
+
+instance Beamable UserT
+deriving instance Show User
+deriving instance Eq User
+
+instance Table UserT where
+  data PrimaryKey UserT f = UserId (Columnar f Text) deriving Generic
+  primaryKey = UserId . _userId
+instance Beamable (PrimaryKey UserT)
 
 -- TODO: Image links
 -- FIXME: json parser would fail here. argh
