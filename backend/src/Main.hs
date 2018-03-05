@@ -50,18 +50,19 @@ main = do
   (Right channels) <- loadFile "/channels.json" :: IO (Either String [Channel])
   -- (Right channels) <- loadFile "/general/2018-02-15.json" :: IO (Either String [Message])
 
-  let dbFile = rootDir <> "slack.db"
+  let dbFile = rootDir <> "/data.sqlite3"
 
   doesFileExist dbFile >>= flip when (removeFile dbFile)
 
   SQLite.withConnection dbFile $ \conn -> do
-    SQLite.execute_ conn "CREATE TABLE channels (id VARCHAR NOT NULL, name VARCHAR NOT NULL, created VARCHAR NOT NULL, PRIMARY KEY( id ));"
-    SQLite.execute_ conn "CREATE TABLE users (id VARCHAR NOT NULL, team_id VARCHAR NOT NULL, name VARCHAR NOT NULL, deleted BOOL NOT NULL, color VARCHAR, real_name VARCHAR, tz VARCHAR, tz_label VARCHAR, tz_offset INTEGER, PRIMARY KEY( id ));"
+    SQLite.withTransaction conn $ do
+      SQLite.execute_ conn "CREATE TABLE channels (id VARCHAR NOT NULL, name VARCHAR NOT NULL, created VARCHAR NOT NULL, PRIMARY KEY( id ));"
+      SQLite.execute_ conn "CREATE TABLE users (id VARCHAR NOT NULL, team_id VARCHAR NOT NULL, name VARCHAR NOT NULL, deleted BOOL NOT NULL, color VARCHAR, real_name VARCHAR, tz VARCHAR, tz_label VARCHAR, tz_offset INTEGER, PRIMARY KEY( id ));"
 
-    withDatabaseDebug putStrLn conn $ do
-      runInsert $
-        insert (_slackUsers slackDb) $
-        insertValues users
-      runInsert $
-        insert (_slackChannels slackDb) $
-        insertValues channels
+      withDatabaseDebug putStrLn conn $ do
+        runInsert $
+          insert (_slackUsers slackDb) $
+          insertValues users
+        runInsert $
+          insert (_slackChannels slackDb) $
+          insertValues channels
