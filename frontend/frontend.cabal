@@ -7,8 +7,8 @@ version:             0.1.0.0
 -- description:         
 license:             BSD3
 license-file:        LICENSE
-author:              Will Fancher
-maintainer:          elvishjerricco@gmail.com
+author:              Sridhar Ratnakumar
+maintainer:          srid@srid.ca
 -- copyright:           
 category:            Web
 build-type:          Simple
