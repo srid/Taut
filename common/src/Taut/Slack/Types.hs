@@ -17,6 +17,9 @@ import Database.Beam
 
 import Taut.Slack.Internal
 
+
+-- User type
+
 data UserT f = User
   { _userId :: Columnar f Text
   , _userTeamId :: Columnar f Text
@@ -53,6 +56,9 @@ data Profile = Profile
   }
   deriving (Eq, Generic, Show)
 
+
+-- Channel type
+
 data ChannelT f = Channel
   { _channelId :: Columnar f Text
   , _channelName :: Columnar f Text
@@ -72,14 +78,30 @@ instance Table ChannelT where
   primaryKey = ChannelId . _channelId
 instance Beamable (PrimaryKey ChannelT)
 
-data Message = Message
-  { _messageType :: Text
-  , _messageUser :: Text -- Join with User ID
-  , _messageText :: Text
-  , _messageClientMsgId :: Maybe Text -- XXX: maybe
-  , _messageTs :: Text -- Timestamp, I think
+
+-- Message type
+
+data MessageT f = Message
+  { _messageType :: Columnar f Text
+  , _messageUser :: Columnar f Text -- Join with User ID
+  , _messageText :: Columnar f Text
+  , _messageClientMsgId :: Columnar f (Maybe Text) -- XXX: This can be empty?
+  , _messageTs :: Columnar f Text -- Timestamp, I think
   }
-  deriving (Eq, Generic, Show)
+  deriving (Generic)
+
+type Message = MessageT Identity
+type MessageId = PrimaryKey MessageT Identity
+
+instance Beamable MessageT
+deriving instance Show Message
+deriving instance Eq Message
+
+instance Table MessageT where
+  data PrimaryKey MessageT f = MessageId (Columnar f Text) deriving Generic
+  primaryKey = MessageId . _messageTs
+instance Beamable (PrimaryKey MessageT)
+
 
 instance FromJSON User where
   parseJSON = genericParseJSON fieldLabelMod
