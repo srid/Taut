@@ -18,6 +18,7 @@ import Data.Monoid ((<>))
 import qualified Data.Text as T
 import System.Directory
 
+import Control.Lens.Operators ((<&>))
 import Database.Beam
 import Database.Beam.Sqlite ()
 import qualified Database.SQLite.Simple as SQLite
@@ -52,8 +53,8 @@ main = do
   messageFiles <- fmap join $ forM channels $ \channel -> do
     let channelName = T.unpack $ _channelName channel
     listDirectory (rootDir <> "/" <> channelName)
-      >>= return . filter (isSuffixOf ".json")
-      >>= return . fmap (\p -> "/" <> channelName <> "/" <> p)
+      <&> filter (isSuffixOf ".json")
+      <&> fmap (mappend ("/" <> channelName <> "/"))
   messages :: [Message] <- fmap join $ forM messageFiles $ \path -> do
     putStrLn $ "Loading " <> path
     loadFile path

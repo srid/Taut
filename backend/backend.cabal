@@ -26,6 +26,7 @@ executable backend
                      , bytestring
                      , common
                      , directory
+                     , lens
                      , sqlite-simple
                      , split
                      , text
