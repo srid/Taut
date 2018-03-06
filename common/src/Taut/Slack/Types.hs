@@ -81,9 +81,12 @@ instance Beamable (PrimaryKey ChannelT)
 
 -- Message type
 
+-- XXX: "user" is not always present; eg. for bots, which have "bot_id" and "subtype"
 data MessageT f = Message
   { _messageType :: Columnar f Text
-  , _messageUser :: Columnar f Text -- Join with User ID
+  , _messageSubtype :: Columnar f (Maybe Text)
+  , _messageUser :: Columnar f (Maybe Text) -- Join with User ID
+  , _messageBotId :: Columnar f (Maybe Text)
   , _messageText :: Columnar f Text
   , _messageClientMsgId :: Columnar f (Maybe Text) -- XXX: This can be empty?
   , _messageTs :: Columnar f Text -- Timestamp, I think

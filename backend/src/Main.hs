@@ -12,7 +12,10 @@ module Main where
 import Control.Monad
 import Data.Aeson
 import qualified Data.ByteString.Lazy as B
+import Data.List (isSuffixOf)
+import Data.List.Split (chunksOf)
 import Data.Monoid ((<>))
+import qualified Data.Text as T
 import System.Directory
 
 import Database.Beam
@@ -43,28 +46,35 @@ loadFile path = B.readFile (rootDir <> path) >>= handleLeft . eitherDecode
 
 main :: IO ()
 main = do
-  -- TODO: other types
   users <- loadFile "/users.json" :: IO [User]
   channels <- loadFile "/channels.json" :: IO [Channel]
-  messages <- loadFile "/general/2018-02-16.json" :: IO [Message]
+
+  messageFiles <- fmap join $ forM channels $ \channel -> do
+    let channelName = T.unpack $ _channelName channel
+    listDirectory (rootDir <> "/" <> channelName)
+      >>= return . filter (isSuffixOf ".json")
+      >>= return . fmap (\p -> "/" <> channelName <> "/" <> p)
+  messages :: [Message] <- fmap join $ forM messageFiles $ \path -> do
+    putStrLn $ "Loading " <> path
+    loadFile path
 
   let dbFile = rootDir <> "/data.sqlite3"
-
   doesFileExist dbFile >>= flip when (removeFile dbFile)
 
   SQLite.withConnection dbFile $ \conn -> do
     SQLite.withTransaction conn $ do
       SQLite.execute_ conn "CREATE TABLE channels (id VARCHAR NOT NULL, name VARCHAR NOT NULL, created VARCHAR NOT NULL, PRIMARY KEY( id ));"
       SQLite.execute_ conn "CREATE TABLE users (id VARCHAR NOT NULL, team_id VARCHAR NOT NULL, name VARCHAR NOT NULL, deleted BOOL NOT NULL, color VARCHAR, real_name VARCHAR, tz VARCHAR, tz_label VARCHAR, tz_offset INTEGER, PRIMARY KEY( id ));"
-      SQLite.execute_ conn "CREATE TABLE messages (type VARCHAR NOT NULL, user VARCHAR NOT NULL, text VARCHAR NOT NULL, client_msg_id VARCHAR, ts VARCHAR NOT NULL, PRIMARY KEY( ts ));"
+      SQLite.execute_ conn "CREATE TABLE messages (type VARCHAR NOT NULL, subtype VARCHAR, user VARCHAR, bot_id VARCHAR, text VARCHAR NOT NULL, client_msg_id VARCHAR, ts VARCHAR NOT NULL, PRIMARY KEY( ts ));"
 
-      withDatabaseDebug putStrLn conn $ do
-        runInsert $
-          insert (_slackMessages slackDb) $
-          insertValues messages
+      withDatabase conn $ do
         runInsert $
           insert (_slackUsers slackDb) $
           insertValues users
         runInsert $
           insert (_slackChannels slackDb) $
           insertValues channels
+        forM_ (chunksOf 100 messages) $ \chunk -> do
+          runInsert $
+            insert (_slackMessages slackDb) $
+            insertValues chunk
