@@ -1,6 +1,6 @@
 # Taut
 
-Archier & viewer for private Slack communities.
+Archiver & viewer for private Slack communities.
 
 ## Development
 
