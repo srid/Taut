@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+
+nix-shell $DIR/default.nix -A shells.ghc --add-root $DIR/dist-newstyle/gc-roots/gc-root --indirect --run "ghcid -c'ghci -O0 -DBACKEND -DUSE_TEMPLATE_HASKELL -Wall -icommon/src -ibackend/src -ifrontend/src Main' -W -T'Main.main'"

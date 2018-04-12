@@ -17,7 +17,6 @@ import Database.Beam
 
 import Taut.Slack.Internal
 
-
 -- User type
 
 data UserT f = User
@@ -56,7 +55,6 @@ data Profile = Profile
   }
   deriving (Eq, Generic, Show)
 
-
 -- Channel type
 
 data ChannelT f = Channel
@@ -77,7 +75,6 @@ instance Table ChannelT where
   data PrimaryKey ChannelT f = ChannelId (Columnar f Text) deriving Generic
   primaryKey = ChannelId . _channelId
 instance Beamable (PrimaryKey ChannelT)
-
 
 -- Message type
 
