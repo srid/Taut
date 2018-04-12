@@ -17,6 +17,7 @@ import Data.List.Split (chunksOf)
 import Data.Monoid ((<>))
 import qualified Data.Text as T
 import System.Directory
+import System.FilePath ((</>))
 
 import Control.Lens.Operators ((<&>))
 import Database.Beam
@@ -41,23 +42,29 @@ slackDb :: DatabaseSettings be SlackDb
 slackDb = defaultDbSettings
 
 loadFile :: FromJSON a => String -> IO a
-loadFile = B.readFile . (rootDir <>) >=> either error return . eitherDecode
-
-channelMessageFiles :: Channel -> IO [String]
-channelMessageFiles channel = do
-  -- FIXME: Replace joining with "/" using library function
-  let channelName = T.unpack $ _channelName channel
-  listDirectory (rootDir <> "/" <> channelName)
-    <&> filter (isSuffixOf ".json")
-    <&> fmap (("/" <> channelName <> "/") <>)
+loadFile = B.readFile >=> either error return . eitherDecode
 
 channelMessages :: Channel -> IO [Message]
-channelMessages = channelMessageFiles >=> fmap join . traverse loadFile
+channelMessages = msgFiles >=> fmap join . traverse loadFile
+  where
+    msgFiles channel = do
+      let c = T.unpack $ _channelName channel
+      listDirectory (rootDir </> c)
+        <&> filter (isSuffixOf ".json")
+        <&> fmap ((rootDir </> c) </>)
+
+-- TODO: Figure out a better way to do this.
+schema :: [SQLite.Query]
+schema =
+  [ "CREATE TABLE channels (id VARCHAR NOT NULL, name VARCHAR NOT NULL, created VARCHAR NOT NULL, PRIMARY KEY( id ));"
+  , "CREATE TABLE users (id VARCHAR NOT NULL, team_id VARCHAR NOT NULL, name VARCHAR NOT NULL, deleted BOOL NOT NULL, color VARCHAR, real_name VARCHAR, tz VARCHAR, tz_label VARCHAR, tz_offset INTEGER, PRIMARY KEY( id ));"
+  , "CREATE TABLE messages (id INTEGER PRIMARY KEY, type VARCHAR NOT NULL, subtype VARCHAR, user VARCHAR, bot_id VARCHAR, text VARCHAR NOT NULL, client_msg_id VARCHAR, ts VARCHAR NOT NULL);"
+  ]
 
 main :: IO ()
 main = do
-  users <- loadFile "/users.json" :: IO [User]
-  channels <- loadFile "/channels.json" :: IO [Channel]
+  users <- loadFile $ rootDir </> "users.json" :: IO [User]
+  channels <- loadFile $ rootDir </> "channels.json" :: IO [Channel]
 
   messages <- fmap join $ traverse channelMessages channels
 
@@ -68,10 +75,7 @@ main = do
 
   SQLite.withConnection dbFile $ \conn -> do
     SQLite.withTransaction conn $ do
-      SQLite.execute_ conn "CREATE TABLE channels (id VARCHAR NOT NULL, name VARCHAR NOT NULL, created VARCHAR NOT NULL, PRIMARY KEY( id ));"
-      SQLite.execute_ conn "CREATE TABLE users (id VARCHAR NOT NULL, team_id VARCHAR NOT NULL, name VARCHAR NOT NULL, deleted BOOL NOT NULL, color VARCHAR, real_name VARCHAR, tz VARCHAR, tz_label VARCHAR, tz_offset INTEGER, PRIMARY KEY( id ));"
-      SQLite.execute_ conn "CREATE TABLE messages (id INTEGER PRIMARY KEY, type VARCHAR NOT NULL, subtype VARCHAR, user VARCHAR, bot_id VARCHAR, text VARCHAR NOT NULL, client_msg_id VARCHAR, ts VARCHAR NOT NULL);"
-
+      forM_ schema $ SQLite.execute_ conn
       withDatabase conn $ do
         runInsert $
           insert (_slackUsers slackDb) $
