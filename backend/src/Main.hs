@@ -41,26 +41,30 @@ slackDb :: DatabaseSettings be SlackDb
 slackDb = defaultDbSettings
 
 loadFile :: FromJSON a => String -> IO a
-loadFile path = B.readFile (rootDir <> path) >>= handleLeft . eitherDecode
-  where handleLeft (Left e) = error e
-        handleLeft (Right v) = return v
+loadFile = B.readFile . (rootDir <>) >=> either error return . eitherDecode
+
+channelMessageFiles :: Channel -> IO [String]
+channelMessageFiles channel = do
+  -- FIXME: Replace joining with "/" using library function
+  let channelName = T.unpack $ _channelName channel
+  listDirectory (rootDir <> "/" <> channelName)
+    <&> filter (isSuffixOf ".json")
+    <&> fmap (("/" <> channelName <> "/") <>)
+
+channelMessages :: Channel -> IO [Message]
+channelMessages = channelMessageFiles >=> fmap join . traverse loadFile
 
 main :: IO ()
 main = do
   users <- loadFile "/users.json" :: IO [User]
   channels <- loadFile "/channels.json" :: IO [Channel]
 
-  messageFiles <- fmap join $ forM channels $ \channel -> do
-    let channelName = T.unpack $ _channelName channel
-    listDirectory (rootDir <> "/" <> channelName)
-      <&> filter (isSuffixOf ".json")
-      <&> fmap (mappend ("/" <> channelName <> "/"))
-  messages :: [Message] <- fmap join $ forM messageFiles $ \path -> do
-    putStrLn $ "Loading " <> path
-    loadFile path
+  messages <- fmap join $ traverse channelMessages channels
 
   let dbFile = rootDir <> "/data.sqlite3"
   doesFileExist dbFile >>= flip when (removeFile dbFile)
+
+  putStrLn $ "Loading " <> show (length messages) <> " messages into " <> dbFile
 
   SQLite.withConnection dbFile $ \conn -> do
     SQLite.withTransaction conn $ do
