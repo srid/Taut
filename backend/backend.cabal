@@ -11,6 +11,15 @@ library
                , common
                , frontend
                , obelisk-backend
+               , aeson
+               , beam-core
+               , beam-sqlite
+               , bytestring
+               , directory
+               , lens
+               , sqlite-simple
+               , split
+               , text
   exposed-modules:
     Backend
   ghc-options: -Wall

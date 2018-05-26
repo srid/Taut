@@ -6,6 +6,12 @@ build-type: Simple
 library
   hs-source-dirs: src
   build-depends: base
+               , aeson
+               , beam-core
+               , casing
+               , text
+               , time
 
   exposed-modules:
-    Common.Api
+    Taut.Slack.Types
+    Taut.Slack.Internal
