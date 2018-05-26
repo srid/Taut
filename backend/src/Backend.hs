@@ -23,6 +23,7 @@ import System.FilePath ((</>))
 import Control.Lens.Operators ((<&>))
 import Database.Beam
 import Database.Beam.Sqlite (runBeamSqlite)
+import Database.Beam.Sqlite.Syntax (SqliteExpressionSyntax)
 import qualified Database.SQLite.Simple as SQLite
 
 import Frontend
@@ -70,16 +71,6 @@ schema =
   , "CREATE TABLE messages (id INTEGER PRIMARY KEY, type VARCHAR NOT NULL, subtype VARCHAR, user VARCHAR, bot_id VARCHAR, text VARCHAR NOT NULL, client_msg_id VARCHAR, ts VARCHAR NOT NULL);"
   ]
 
--- XXX: Revisit this hack.
-mkMessage m = Message default_
-  (val_ $ _messageType m)
-  (val_ $ _messageSubtype m)
-  (val_ $ _messageUser m)
-  (val_ $ _messageBotId m)
-  (val_ $ _messageText m)
-  (val_ $ _messageClientMsgId m)
-  (val_ $ _messageTs m)
-
 dbMain :: IO ()
 dbMain = do
   users <- loadFile $ rootDir </> "users.json" :: IO [User]
@@ -92,16 +83,33 @@ dbMain = do
 
   putStrLn $ "Loading " <> show (length messages) <> " messages into " <> dbFile
 
-  conn <- SQLite.open dbFile
-  forM_ schema $ SQLite.execute_ conn
-  runBeamSqlite conn $ do
-    runInsert $
-      insert (_slackUsers slackDb) $
-      insertValues users
-    runInsert $
-      insert (_slackChannels slackDb) $
-      insertValues channels
-    forM_ (chunksOf 100 messages) $ \chunk -> do
-      runInsert $
-        insert (_slackMessages slackDb) $
-        insertExpressions (mkMessage <$> chunk)
+  SQLite.withConnection dbFile $ \conn -> do
+    SQLite.withTransaction conn $ do
+      -- Create tables
+      forM_ schema $ SQLite.execute_ conn
+      -- Load JSON data
+      runBeamSqlite conn $ do
+        runInsert $
+          insert (_slackUsers slackDb) $
+          insertValues users
+        runInsert $
+          insert (_slackChannels slackDb) $
+          insertValues channels
+        forM_ (chunksOf 100 messages) $ \chunk -> do
+          runInsert $
+            insert (_slackMessages slackDb) $
+            insertExpressions (mkMessageExpr <$> chunk)
+  where
+    -- Deal with auto increment primary keys by using `default_` on a plain value
+    -- decoded by Aeson.
+    -- TODO: Is there a better approach to this?
+    mkMessageExpr :: Message -> MessageT (QExpr SqliteExpressionSyntax s)
+    mkMessageExpr m = Message default_
+      (val_ $ _messageType m)
+      (val_ $ _messageSubtype m)
+      (val_ $ _messageUser m)
+      (val_ $ _messageBotId m)
+      (val_ $ _messageText m)
+      (val_ $ _messageClientMsgId m)
+      (val_ $ _messageTs m)
+
