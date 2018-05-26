@@ -1,5 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -20,7 +22,8 @@ import System.FilePath ((</>))
 
 import Control.Lens.Operators ((<&>))
 import Database.Beam
-import Database.Beam.Sqlite ()
+import Database.Beam.Sqlite (runBeamSqlite)
+import Database.Beam.Sqlite.Syntax (SqliteExpressionSyntax)
 import qualified Database.SQLite.Simple as SQLite
 
 import Frontend
@@ -43,7 +46,7 @@ data SlackDb f = SlackDb
   }
   deriving (Generic)
 
-instance Database SlackDb
+instance Database be SlackDb
 
 slackDb :: DatabaseSettings be SlackDb
 slackDb = defaultDbSettings
@@ -82,8 +85,10 @@ dbMain = do
 
   SQLite.withConnection dbFile $ \conn -> do
     SQLite.withTransaction conn $ do
+      -- Create tables
       forM_ schema $ SQLite.execute_ conn
-      withDatabase conn $ do
+      -- Load JSON data
+      runBeamSqlite conn $ do
         runInsert $
           insert (_slackUsers slackDb) $
           insertValues users
@@ -93,4 +98,18 @@ dbMain = do
         forM_ (chunksOf 100 messages) $ \chunk -> do
           runInsert $
             insert (_slackMessages slackDb) $
-            insertValues chunk
+            insertExpressions (mkMessageExpr <$> chunk)
+  where
+    -- Deal with auto increment primary keys by using `default_` on a plain value
+    -- decoded by Aeson.
+    -- TODO: Is there a better approach to this?
+    mkMessageExpr :: Message -> MessageT (QExpr SqliteExpressionSyntax s)
+    mkMessageExpr m = Message default_
+      (val_ $ _messageType m)
+      (val_ $ _messageSubtype m)
+      (val_ $ _messageUser m)
+      (val_ $ _messageBotId m)
+      (val_ $ _messageText m)
+      (val_ $ _messageClientMsgId m)
+      (val_ $ _messageTs m)
+

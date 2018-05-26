@@ -6,7 +6,6 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
-
 module Taut.Slack.Types where
 
 import Data.Aeson
@@ -80,7 +79,7 @@ instance Beamable (PrimaryKey ChannelT)
 
 -- XXX: "user" is not always present; eg. for bots, which have "bot_id" and "subtype"
 data MessageT f = Message
-  { _messageId :: Columnar f (Auto Int)
+  { _messageId :: Columnar f (Maybe Int)
   , _messageType :: Columnar f Text
   , _messageSubtype :: Columnar f (Maybe Text)
   , _messageUser :: Columnar f (Maybe Text) -- Join with User ID
@@ -99,10 +98,9 @@ deriving instance Show Message
 deriving instance Eq Message
 
 instance Table MessageT where
-  data PrimaryKey MessageT f = MessageId (Columnar f (Auto Int)) deriving Generic
+  data PrimaryKey MessageT f = MessageId (Columnar f (Maybe Int)) deriving Generic
   primaryKey = MessageId . _messageId
 instance Beamable (PrimaryKey MessageT)
-
 
 instance FromJSON User where
   parseJSON = genericParseJSON fieldLabelMod
@@ -111,18 +109,7 @@ instance FromJSON Profile where
 instance FromJSON Channel where
   parseJSON = genericParseJSON fieldLabelMod
 instance FromJSON Message where
-  -- We are forced to manually write this merely to set the autoincrement
-  -- field.
-  parseJSON = withObject "message" $ \o -> do
-    _messageId <- return $ Auto Nothing
-    _messageType <- o .: "type"
-    _messageSubtype <- o .:? "subtype"
-    _messageUser <- o .:? "user"
-    _messageBotId <- o .:? "bot_id"
-    _messageText <- o .: "text"
-    _messageClientMsgId <- o .:? "client_msg_id"
-    _messageTs <- o .: "ts"
-    return Message{..}
+  parseJSON = genericParseJSON fieldLabelMod
 
 instance ToJSON User where
   toJSON = genericToJSON fieldLabelMod
