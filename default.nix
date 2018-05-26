@@ -12,8 +12,8 @@ project ./. ({ pkgs, ... }: {
     beam = pkgs.fetchFromGitHub {
       owner = "tathougies";
       repo = "beam";
-      rev = "a3b5e0763843fed48c7eef53fa7d08cfe710342d";
-      sha256 = "15w4rqwj3wpssah6664pwvlh6lvv7pv4xa9v81kj3p1vx74lx9ps";
+      rev = "011999d65680debdf3d9a7c7efaf5679dc64368b";
+      sha256 = "1g4pznzvl3iwnk02mlcwklrzc9frhahk7irrwggaf4395g95r6z4";
     };
   in
   {

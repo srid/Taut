@@ -80,7 +80,7 @@ instance Beamable (PrimaryKey ChannelT)
 
 -- XXX: "user" is not always present; eg. for bots, which have "bot_id" and "subtype"
 data MessageT f = Message
-  { _messageId :: Columnar f (Auto Int)
+  { _messageId :: Columnar f Int
   , _messageType :: Columnar f Text
   , _messageSubtype :: Columnar f (Maybe Text)
   , _messageUser :: Columnar f (Maybe Text) -- Join with User ID
@@ -99,7 +99,7 @@ deriving instance Show Message
 deriving instance Eq Message
 
 instance Table MessageT where
-  data PrimaryKey MessageT f = MessageId (Columnar f (Auto Int)) deriving Generic
+  data PrimaryKey MessageT f = MessageId (Columnar f Int) deriving Generic
   primaryKey = MessageId . _messageId
 instance Beamable (PrimaryKey MessageT)
 
@@ -113,8 +113,9 @@ instance FromJSON Channel where
 instance FromJSON Message where
   -- We are forced to manually write this merely to set the autoincrement
   -- field.
+  -- TODO: This is not still applicable; reevaluate.
   parseJSON = withObject "message" $ \o -> do
-    _messageId <- return $ Auto Nothing
+    _messageId <- return $ 0
     _messageType <- o .: "type"
     _messageSubtype <- o .:? "subtype"
     _messageUser <- o .:? "user"
