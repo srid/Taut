@@ -3,16 +3,19 @@
 {-# LANGUAGE TypeApplications #-}
 module Frontend where
 
-import qualified Data.Text as T
 import Reflex.Dom.Core
 
-import Static
+import Obelisk.Frontend
+import Obelisk.Route.Frontend
 
-frontend :: (StaticWidget x (), Widget x ())
-frontend = (head', body)
-  where
-    head' = el "title" $ text "Taut"
-    body = do
+import Taut.Route
+
+frontend :: Frontend (R Route)
+frontend = Frontend
+  { _frontend_head = subRoute_ $ \_r -> do
+      el "title" $ text "Taut"
+  , _frontend_body = subRoute_ $ \_r -> do
       el "h1" $ text "Taut"
       el "p" $ text "Work in progress"
-      -- elAttr "img" ("src" =: static @"obelisk.jpg") blank
+  , _frontend_notFoundRoute = \_ -> Route_Home :/ () -- TODO: not used i think
+  }

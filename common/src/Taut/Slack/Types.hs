@@ -6,18 +6,17 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
+-- | Slack database (beam) types
 module Taut.Slack.Types where
 
 import Data.Aeson
 import Data.Text (Text)
-import Data.Time (UTCTime)
 
 import Database.Beam
 
 import Taut.Slack.Internal
 
--- User type
-
+-- | Slack User
 data UserT f = User
   { _userId :: Columnar f Text
   , _userTeamId :: Columnar f Text
@@ -54,8 +53,7 @@ data Profile = Profile
   }
   deriving (Eq, Generic, Show)
 
--- Channel type
-
+-- | Slack Channel
 data ChannelT f = Channel
   { _channelId :: Columnar f Text
   , _channelName :: Columnar f Text
@@ -75,8 +73,7 @@ instance Table ChannelT where
   primaryKey = ChannelId . _channelId
 instance Beamable (PrimaryKey ChannelT)
 
--- Message type
-
+-- | Slack Message
 -- XXX: "user" is not always present; eg. for bots, which have "bot_id" and "subtype"
 data MessageT f = Message
   { _messageId :: Columnar f (Maybe Int)

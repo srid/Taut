@@ -1,5 +1,11 @@
-import Reflex.Dom
 import Frontend
+import Obelisk.Frontend
+import Obelisk.Route.Frontend
+import Reflex.Dom
+
+import Taut.Route
 
 main :: IO ()
-main = mainWidget $ snd frontend
+main = do
+  let Right validFullEncoder = checkEncoder backendRouteEncoder
+  run $ runFrontend validFullEncoder frontend
