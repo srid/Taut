@@ -10,6 +10,13 @@ library
                , reflex-dom
                , static
                , text
+               , string-conv
+               , obelisk-route
+               , obelisk-frontend
+               , clay
+               , modern-uri
+               , jsaddle
+               , mtl
   exposed-modules:
     Frontend
   ghc-options: -Wall
@@ -23,6 +30,13 @@ executable frontend
                , static
                , text
                , frontend
+               , string-conv
+               , obelisk-route
+               , obelisk-frontend
+               , clay
+               , modern-uri
+               , jsaddle
+               , mtl
   --TODO: Make these ghc-options optional
   ghc-options: -threaded
   if os(darwin)

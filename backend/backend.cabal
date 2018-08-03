@@ -15,11 +15,21 @@ library
                , beam-core
                , beam-sqlite
                , bytestring
-               , directory
                , lens
                , sqlite-simple
                , split
                , text
+               , reflex-dom-core
+               , obelisk-backend
+               , dependent-sum
+               , dependent-sum-template
+               , mmark
+               , modern-uri
+               , yaml
+               , directory
+               , filepath
+               , foldl
+               , snap
   exposed-modules:
     Backend
   ghc-options: -Wall
@@ -39,3 +49,14 @@ executable backend
                , obelisk-executable-config
                , obelisk-executable-config-inject
                , text
+               , reflex-dom-core
+               , obelisk-backend
+               , dependent-sum
+               , dependent-sum-template
+               , mmark
+               , modern-uri
+               , yaml
+               , directory
+               , filepath
+               , foldl
+               , snap

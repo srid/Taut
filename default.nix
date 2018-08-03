@@ -8,6 +8,15 @@ project ./. ({ pkgs, hackGet, ... }: {
   ios.bundleIdentifier = "ca.srid.Taut";
   ios.bundleName = "Taut";
 
+  packages = {
+    clay = pkgs.fetchFromGitHub {
+      owner = "sebastiaanvisser";
+      repo = "clay";
+      rev = "54dc9eaf0abd180ef9e35d97313062d99a02ee75";
+      sha256 = "0y38hyd2gvr7lrbxkrjwg4h0077a54m7gxlvm9s4kk0995z1ncax";
+    };
+  };
+
   overrides = self: super: with pkgs.haskell.lib; let
     beam = hackGet ./dep/beam;
     direct-sqlite-src = pkgs.fetchFromGitHub {
@@ -24,11 +33,13 @@ project ./. ({ pkgs, hackGet, ... }: {
     };
   in
   {
-    beam-core = self.callCabal2nix "beam-core" (beam + /beam-core) {};
+    clay = dontCheck super.clay;
+    beam-core = dontCheck (self.callCabal2nix "beam-core" (beam + /beam-core) {});
     beam-migrate = self.callCabal2nix "beam-migrate" (beam + /beam-migrate) {};
     beam-sqlite = self.callCabal2nix "beam-sqlite" (beam + /beam-sqlite) {};
     direct-sqlite = self.callCabal2nix "direct-sqlite" direct-sqlite-src {};
     vector-sized = doJailbreak (self.callCabal2nix "vector-sized" vector-sized-src {});
     indexed-list-literals = doJailbreak super.indexed-list-literals;
+    email-validate = doJailbreak super.email-validate;
   };
 })

@@ -5,13 +5,25 @@ build-type: Simple
 
 library
   hs-source-dirs: src
-  build-depends: base
-               , aeson
+  build-depends: aeson
+               , base
+               , bytestring
+               , dependent-sum
+               , dependent-sum-template
+               , obelisk-route
+               , mtl
+               , text
+               , these
+               , universe
+               , reflex
+               , filepath
+               , template-haskell
+               , universe-template
                , beam-core
                , casing
-               , text
-               , time
 
   exposed-modules:
+    Taut.Route
     Taut.Slack.Types
     Taut.Slack.Internal
+  ghc-options: -Wall
