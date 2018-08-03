@@ -34,6 +34,8 @@ project ./. ({ pkgs, hackGet, ... }: {
   in
   {
     clay = dontCheck super.clay;
+    mmark = dontCheck super.mmark;
+    megaparsec = dontCheck super.megaparsec;
     beam-core = dontCheck (self.callCabal2nix "beam-core" (beam + /beam-core) {});
     beam-migrate = self.callCabal2nix "beam-migrate" (beam + /beam-migrate) {};
     beam-sqlite = self.callCabal2nix "beam-sqlite" (beam + /beam-sqlite) {};

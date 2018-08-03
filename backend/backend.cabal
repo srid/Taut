@@ -41,10 +41,16 @@ executable backend
     buildable: False
   build-depends: base
                , backend
+               , aeson
+               , split
                , common
                , frontend
                , lens
                , modern-uri
+               , bytestring
+               , beam-core
+               , beam-sqlite
+               , sqlite-simple
                , obelisk-backend
                , obelisk-executable-config
                , obelisk-executable-config-inject
