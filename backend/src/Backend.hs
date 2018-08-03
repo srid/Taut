@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -13,10 +14,13 @@ module Backend where
 import Control.Monad
 import Data.Aeson
 import qualified Data.ByteString.Lazy as B
+import Data.Dependent.Sum (DSum (..))
+import Data.Functor.Identity
 import Data.List (isSuffixOf)
 import Data.List.Split (chunksOf)
 import Data.Monoid ((<>))
 import qualified Data.Text as T
+import Snap
 import System.Directory
 import System.FilePath ((</>))
 
@@ -26,14 +30,19 @@ import Database.Beam.Sqlite (runBeamSqlite)
 import Database.Beam.Sqlite.Syntax (SqliteExpressionSyntax)
 import qualified Database.SQLite.Simple as SQLite
 
-import Frontend
-import qualified Obelisk.Backend as Ob
+import Obelisk.Backend as Ob
 
+import Taut.Route
 import Taut.Slack.Types
 
-backend :: IO ()
-backend = dbMain >> Ob.backend Ob.def
-  { Ob._backendConfig_head = fst frontend
+backend :: Backend BackendRoute Route
+backend = Backend
+  { _backend_routeEncoder = backendRouteEncoder
+  , _backend_run = \serve -> do
+      liftIO dbMain
+      serve $ \case
+        BackendRoute_GetPage :=> Identity _f -> do
+          writeBS "hello"
   }
 
 rootDir :: String
