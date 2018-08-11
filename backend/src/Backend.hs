@@ -46,7 +46,7 @@ backend = Backend
   }
 
 rootDir :: String
-rootDir = "/home/srid/tmp/data"
+rootDir = "/home/srid/code/Taut/tmp"
 
 data SlackDb f = SlackDb
   { _slackChannels :: f (TableEntity ChannelT)
