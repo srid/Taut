@@ -23,7 +23,7 @@ library
                , casing
 
   exposed-modules:
-    Taut.Route
-    Taut.Slack.Types
-    Taut.Slack.Internal
+    Common.Route
+    Common.Slack.Types
+    Common.Slack.Internal
   ghc-options: -Wall

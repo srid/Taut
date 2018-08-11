@@ -8,7 +8,7 @@ import Reflex.Dom.Core
 import Obelisk.Frontend
 import Obelisk.Route.Frontend
 
-import Taut.Route
+import Common.Route
 
 frontend :: Frontend (R Route)
 frontend = Frontend

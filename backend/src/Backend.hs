@@ -32,8 +32,8 @@ import qualified Database.SQLite.Simple as SQLite
 
 import Obelisk.Backend as Ob
 
-import Taut.Route
-import Taut.Slack.Types
+import Common.Route
+import Common.Slack.Types
 
 backend :: Backend BackendRoute Route
 backend = Backend

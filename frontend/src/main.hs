@@ -3,7 +3,7 @@ import Obelisk.Frontend
 import Obelisk.Route.Frontend
 import Reflex.Dom
 
-import Taut.Route
+import Common.Route
 
 main :: IO ()
 main = do

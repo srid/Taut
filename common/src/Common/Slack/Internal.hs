@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Taut.Slack.Internal (fieldLabelMod) where
+module Common.Slack.Internal (fieldLabelMod) where
 
 import Data.Aeson
 import Data.Char (isUpper)

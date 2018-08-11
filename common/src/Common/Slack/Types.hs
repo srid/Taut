@@ -7,14 +7,14 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 -- | Slack database (beam) types
-module Taut.Slack.Types where
+module Common.Slack.Types where
 
 import Data.Aeson
 import Data.Text (Text)
 
 import Database.Beam
 
-import Taut.Slack.Internal
+import Common.Slack.Internal
 
 -- | Slack User
 data UserT f = User
