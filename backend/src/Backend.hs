@@ -109,11 +109,8 @@ dbMain = do
             insert (_slackMessages slackDb) $
             insertExpressions (mkMessageExpr <$> chunk)
   where
-    -- Deal with auto increment primary keys by using `default_` on a plain value
-    -- decoded by Aeson.
-    -- TODO: Is there a better approach to this?
     mkMessageExpr :: Message -> MessageT (QExpr SqliteExpressionSyntax s)
-    mkMessageExpr m = Message default_
+    mkMessageExpr m = Message
       (val_ $ _messageType m)
       (val_ $ _messageSubtype m)
       (val_ $ _messageUser m)

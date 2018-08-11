@@ -76,14 +76,13 @@ instance Beamable (PrimaryKey ChannelT)
 -- | Slack Message
 -- XXX: "user" is not always present; eg. for bots, which have "bot_id" and "subtype"
 data MessageT f = Message
-  { _messageId :: Columnar f (Maybe Int)
-  , _messageType :: Columnar f Text
+  { _messageType :: Columnar f Text
   , _messageSubtype :: Columnar f (Maybe Text)
   , _messageUser :: Columnar f (Maybe Text) -- Join with User ID
   , _messageBotId :: Columnar f (Maybe Text)
   , _messageText :: Columnar f Text
   , _messageClientMsgId :: Columnar f (Maybe Text) -- XXX: This can be empty?
-  , _messageTs :: Columnar f Text -- Timestamp, I think
+  , _messageTs :: Columnar f Text -- Timestamp
   }
   deriving (Generic)
 
@@ -94,9 +93,12 @@ instance Beamable MessageT
 deriving instance Show Message
 deriving instance Eq Message
 
+-- Timestamps in Slack export archives are precise enough (eg:
+-- "1514808718.000015") to be treated as primary keys, such as to allow us to
+-- use them in the URL paths to access specific messages.
 instance Table MessageT where
-  data PrimaryKey MessageT f = MessageId (Columnar f (Maybe Int)) deriving Generic
-  primaryKey = MessageId . _messageId
+  data PrimaryKey MessageT f = MessageId (Columnar f Text) deriving Generic
+  primaryKey = MessageId . _messageTs
 instance Beamable (PrimaryKey MessageT)
 
 instance FromJSON User where
