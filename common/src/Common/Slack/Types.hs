@@ -145,7 +145,7 @@ instance ToJSON Message where
       -- TODO: Check if this converts back to the same value 
       -- NOTE: it does not; loses the double precision. do we care?
       toSlackTs :: UTCTime -> Text
-      toSlackTs t = T.pack $ show $ realToFrac $ utcTimeToPOSIXSeconds t
+      toSlackTs t = T.pack $ show $ (realToFrac (utcTimeToPOSIXSeconds t) :: Double)
 
 instance ToJSON User where
   toJSON = genericToJSON fieldLabelMod

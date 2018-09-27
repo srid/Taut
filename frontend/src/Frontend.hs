@@ -46,7 +46,6 @@ frontend = Frontend
                 text "Messages for: "
                 text $ T.pack $ show day
               pb <- getPostBuild
-              -- TODO: don't hardcode url?
               v' :: Event t (Maybe [Message]) <- prerender (pure never) $ 
                 getAndDecode $ urlForBackendGetMessages (fromGregorian 2017 4 7) <$ pb
               widgetHold_ (text "Loading") $ ffor v' $ \case 

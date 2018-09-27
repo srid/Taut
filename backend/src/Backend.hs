@@ -40,17 +40,15 @@ backend = Backend
   { _backend_routeEncoder = backendRouteEncoder
   , _backend_run = \serve -> do
       liftIO populateDatabase
-      q <- liftIO $ pure $ do 
-        let dbFile = rootDir <> "/data.sqlite3"
-        SQLite.withConnection dbFile $ \conn -> do
-          runBeamSqlite conn $ 
-            runSelectReturningList $ 
-            select $ do
-              user <- limit_ 10 $ all_ (_slackMessages slackDb)
-              pure user
       serve $ \case
         BackendRoute_GetMessages :=> Identity _day -> do
-          msgs :: [Message] <- liftIO q
+          let dbFile = rootDir <> "/data.sqlite3"
+          msgs :: [Message] <- liftIO $ SQLite.withConnection dbFile $ \conn -> do
+            runBeamSqlite conn $ 
+              runSelectReturningList $ 
+              select $ do
+                user <- limit_ 10 $ all_ (_slackMessages slackDb)
+                pure user
           writeLBS $ encode msgs
   }
 
