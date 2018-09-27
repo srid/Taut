@@ -5,7 +5,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -39,7 +38,7 @@ backend :: Backend BackendRoute Route
 backend = Backend
   { _backend_routeEncoder = backendRouteEncoder
   , _backend_run = \serve -> do
-      liftIO dbMain
+      liftIO populateDatabase
       serve $ \case
         BackendRoute_GetPage :=> Identity _f -> do
           writeBS "hello"
@@ -72,7 +71,7 @@ channelMessages = msgFiles >=> fmap join . traverse loadFile
         <&> filter (isSuffixOf ".json")
         <&> fmap ((rootDir </> c) </>)
 
--- TODO: Figure out a better way to do this.
+-- TODO: Figure out a better way to do this. beam-migrate?
 schema :: [SQLite.Query]
 schema =
   [ "CREATE TABLE channels (id VARCHAR NOT NULL, name VARCHAR NOT NULL, created VARCHAR NOT NULL, PRIMARY KEY( id ));"
@@ -80,8 +79,8 @@ schema =
   , "CREATE TABLE messages (id INTEGER PRIMARY KEY, type VARCHAR NOT NULL, subtype VARCHAR, user VARCHAR, bot_id VARCHAR, text VARCHAR NOT NULL, client_msg_id VARCHAR, ts VARCHAR NOT NULL);"
   ]
 
-dbMain :: IO ()
-dbMain = do
+populateDatabase :: IO ()
+populateDatabase = do
   users <- loadFile $ rootDir </> "users.json" :: IO [User]
   channels <- loadFile $ rootDir </> "channels.json" :: IO [Channel]
 
