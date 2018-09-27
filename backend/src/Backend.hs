@@ -40,8 +40,8 @@ backend = Backend
   , _backend_run = \serve -> do
       liftIO populateDatabase
       serve $ \case
-        BackendRoute_GetPage :=> Identity _f -> do
-          writeBS "hello"
+        BackendRoute_GetMessages :=> Identity _day -> do
+          writeBS "todo"
   }
 
 rootDir :: String

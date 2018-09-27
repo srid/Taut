@@ -34,13 +34,13 @@ backendRouteEncoder = Encoder $ do
   myObeliskRestValidEncoder <- checkObeliskRouteRestEncoder routeRestEncoder
   checkEncoder $ pathComponentEncoder myComponentEncoder $ \case
     InL backendRoute -> case backendRoute of
-      BackendRoute_GetPage -> pathOnlyValidEncoder
+      BackendRoute_GetMessages -> dayEncoder
     InR obeliskRoute -> runValidEncoderFunc myObeliskRestValidEncoder obeliskRoute
 
 --TODO: Should we rename `Route` to `AppRoute`?
 data BackendRoute :: * -> * where
   --TODO: How do we do routes with strongly-typed results?
-  BackendRoute_GetPage :: BackendRoute [Text]
+  BackendRoute_GetMessages :: BackendRoute Day
 
 data Route :: * -> * where
   Route_Home :: Route ()
@@ -48,11 +48,11 @@ data Route :: * -> * where
 
 backendRouteComponentEncoder :: (MonadError Text check, MonadError Text parse) => Encoder check parse (Some BackendRoute) (Maybe Text)
 backendRouteComponentEncoder = enumEncoder $ \case
-  Some.This BackendRoute_GetPage -> Just "get-page"
+  Some.This BackendRoute_GetMessages -> Just "get-messages"
 
 backendRouteRestEncoder :: (Applicative check, MonadError Text parse) => BackendRoute a -> Encoder check parse a PageName
 backendRouteRestEncoder = Encoder . pure . \case
-  BackendRoute_GetPage -> pathOnlyValidEncoder
+  BackendRoute_GetMessages -> dayEncoder
 
 routeComponentEncoder
   :: (MonadError Text check, MonadError Text parse)

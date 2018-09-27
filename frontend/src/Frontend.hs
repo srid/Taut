@@ -39,9 +39,11 @@ frontend = Frontend
           Route_Home -> el "p" $ text "We'll show your Slack archive here. Hold tight!"
           Route_Messages -> do
             r :: Dynamic t Day <- askRoute
-            el "p" $ do
-              text "Messages for: "
-              dynText $ fmap (T.pack . show) r
+            dyn_ $ ffor r $ \day -> do
+              -- TODO: call backend GetMessages
+              el "p" $ do
+                text "Messages for: "
+                text $ T.pack $ show day
         divClass "ui bottom attached secondary segment" $ do
           el "p" $ text "This is a work in progress"
   , _frontend_notFoundRoute = \_ -> Route_Home :/ () -- TODO: not used i think
