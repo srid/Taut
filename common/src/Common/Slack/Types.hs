@@ -1,7 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeSynonymInstances #-}
@@ -82,7 +80,7 @@ data MessageT f = Message
   , _messageBotId :: Columnar f (Maybe Text)
   , _messageText :: Columnar f Text
   , _messageClientMsgId :: Columnar f (Maybe Text) -- XXX: This can be empty?
-  , _messageTs :: Columnar f Text -- Timestamp
+  , _messageTs :: Columnar f Text -- Timestamp (TODO: parse into Day)
   }
   deriving (Generic)
 

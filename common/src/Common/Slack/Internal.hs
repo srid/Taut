@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Common.Slack.Internal (fieldLabelMod) where
 
 import Data.Aeson
