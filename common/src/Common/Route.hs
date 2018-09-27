@@ -70,14 +70,12 @@ routeRestEncoder = Encoder . pure . \case
 dateEncoder :: MonadError Text parse => ValidEncoder parse Day PageName
 dateEncoder = ValidEncoder
   -- TODO: throwError on invalid input
-  { _validEncoder_decode = \(path, query) ->
-      if query == mempty
-      then case path of
+  { _validEncoder_decode = \(path, _query) ->
+      case path of
         -- TODO: use readMaybe
         -- TODO: use fromGregorianValid
         [y, m, d] -> pure $ fromGregorian (read $ T.unpack y) (read $ T.unpack m) (read $ T.unpack d)
         _ -> throwError "dateEncoder: expected exactly 3 path elements"
-      else throwError "dateEncoder: query was provided"
   , _validEncoder_encode = \day -> 
       let (y, m, d) = toGregorian day 
       in ([T.pack $ show y, T.pack $ show m, T.pack $ show d], mempty) 
