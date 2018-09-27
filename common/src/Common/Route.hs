@@ -19,6 +19,7 @@ import qualified Data.Some as Some
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time.Calendar
+import Text.Read (readMaybe)
 
 import Obelisk.Route
 import Obelisk.Route.TH
@@ -65,21 +66,23 @@ routeRestEncoder
   => Route a -> Encoder check parse a PageName
 routeRestEncoder = Encoder . pure . \case
   Route_Home -> endValidEncoder mempty
-  Route_Messages -> dateEncoder
+  Route_Messages -> dayEncoder
 
-dateEncoder :: MonadError Text parse => ValidEncoder parse Day PageName
-dateEncoder = ValidEncoder
-  -- TODO: throwError on invalid input
-  { _validEncoder_decode = \(path, _query) ->
-      case path of
-        -- TODO: use readMaybe
-        -- TODO: use fromGregorianValid
-        [y, m, d] -> pure $ fromGregorian (read $ T.unpack y) (read $ T.unpack m) (read $ T.unpack d)
-        _ -> throwError "dateEncoder: expected exactly 3 path elements"
-  , _validEncoder_encode = \day -> 
-      let (y, m, d) = toGregorian day 
-      in ([T.pack $ show y, T.pack $ show m, T.pack $ show d], mempty) 
+dayEncoder :: MonadError Text parse => ValidEncoder parse Day PageName
+dayEncoder = ValidEncoder
+  { _validEncoder_decode = \(path, _query) -> case path of
+      [y, m, d] -> maybe (throwError "dayEncoder: invalid day") pure $ parseDay y m d
+      _ -> throwError "dayEncoder: expected exactly 3 path elements"
+  , _validEncoder_encode = \day ->
+      let (y, m, d) = toGregorian day
+      in ([T.pack $ show y, T.pack $ show m, T.pack $ show d], mempty)
   }
+  where
+    parseDay y' m' d' = do
+      y <- readMaybe $ T.unpack y'
+      m <- readMaybe $ T.unpack m'
+      d <- readMaybe $ T.unpack d'
+      fromGregorianValid y m d
 
 
 concat <$> mapM deriveRouteComponent
