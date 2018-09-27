@@ -41,7 +41,7 @@ backend = Backend
       liftIO populateDatabase
       serve $ \case
         BackendRoute_GetMessages :=> Identity _day -> do
-          writeBS "todo"
+          writeBS "42"
   }
 
 rootDir :: String

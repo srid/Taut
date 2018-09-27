@@ -40,10 +40,14 @@ frontend = Frontend
           Route_Messages -> do
             r :: Dynamic t Day <- askRoute
             dyn_ $ ffor r $ \day -> do
-              -- TODO: call backend GetMessages
               el "p" $ do
                 text "Messages for: "
                 text $ T.pack $ show day
+              pb <- getPostBuild
+              -- TODO: don't hardcode url?
+              v' :: Event t (Maybe Int) <- prerender (pure never) $ 
+                getAndDecode $ "/get-messages/2017/04/07" <$ pb
+              widgetHold_ (text "Loading") $ ffor v' $ \v -> text $ "We received: " <> T.pack (show v)
         divClass "ui bottom attached secondary segment" $ do
           el "p" $ text "This is a work in progress"
   , _frontend_notFoundRoute = \_ -> Route_Home :/ () -- TODO: not used i think
