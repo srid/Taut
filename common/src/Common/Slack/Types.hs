@@ -131,13 +131,25 @@ instance FromJSON Message where
         let time = posixSecondsToUTCTime $ fromInteger $ round ts
         pure $ Message type_ subtype user botid txt msgid time
 
--- TODO: Implement ToJSON that converts to the same ts. Uhh.
+instance ToJSON Message where 
+  toJSON m = object 
+    [ "type" .= _messageType m 
+    , "subtype" .= _messageSubtype m 
+    , "user" .= _messageUser m 
+    , "bot_id" .= _messageBotId m 
+    , "text" .= _messageText m 
+    , "client_msg_id" .= _messageClientMsgId m
+    , "ts" .= toSlackTs (_messageTs m)
+    ]
+    where 
+      -- TODO: Check if this converts back to the same value 
+      -- NOTE: it does not; loses the double precision. do we care?
+      toSlackTs :: UTCTime -> Text
+      toSlackTs t = T.pack $ show $ realToFrac $ utcTimeToPOSIXSeconds t
 
 instance ToJSON User where
   toJSON = genericToJSON fieldLabelMod
 instance ToJSON Profile where
   toJSON = genericToJSON fieldLabelMod
 instance ToJSON Channel where
-  toJSON = genericToJSON fieldLabelMod
-instance ToJSON Message where
   toJSON = genericToJSON fieldLabelMod

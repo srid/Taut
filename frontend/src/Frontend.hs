@@ -7,6 +7,7 @@
 {-# LANGUAGE TypeApplications #-}
 module Frontend where
 
+import Control.Monad
 import qualified Data.Text as T
 import Data.Time.Calendar
 
@@ -48,7 +49,11 @@ frontend = Frontend
               -- TODO: don't hardcode url?
               v' :: Event t (Maybe [Message]) <- prerender (pure never) $ 
                 getAndDecode $ urlForBackendGetMessages (fromGregorian 2017 4 7) <$ pb
-              widgetHold_ (text "Loading") $ ffor v' $ \v -> text $ "We received: " <> T.pack (show v)
+              widgetHold_ (text "Loading") $ ffor v' $ \case 
+                Nothing -> text "No data" 
+                Just msgs -> do 
+                  forM_ msgs $ \msg -> do
+                    el "li" $ el "tt" $ text $ T.pack $ show msg
         divClass "ui bottom attached secondary segment" $ do
           el "p" $ text "This is a work in progress"
   , _frontend_notFoundRoute = \_ -> Route_Home :/ () -- TODO: not used i think
