@@ -19,6 +19,7 @@ library
                , sqlite-simple
                , split
                , text
+               , time
                , reflex-dom-core
                , obelisk-backend
                , dependent-sum

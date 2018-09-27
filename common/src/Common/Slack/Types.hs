@@ -1,5 +1,8 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeSynonymInstances #-}
@@ -9,6 +12,10 @@ module Common.Slack.Types where
 
 import Data.Aeson
 import Data.Text (Text)
+import qualified Data.Text as T
+import Data.Time.Clock
+import Data.Time.Clock.POSIX
+import Text.Read (readMaybe)
 
 import Database.Beam
 
@@ -80,7 +87,7 @@ data MessageT f = Message
   , _messageBotId :: Columnar f (Maybe Text)
   , _messageText :: Columnar f Text
   , _messageClientMsgId :: Columnar f (Maybe Text) -- XXX: This can be empty?
-  , _messageTs :: Columnar f Text -- Timestamp (TODO: parse into Day)
+  , _messageTs :: Columnar f UTCTime
   }
   deriving (Generic)
 
@@ -95,7 +102,7 @@ deriving instance Eq Message
 -- "1514808718.000015") to be treated as primary keys, such as to allow us to
 -- use them in the URL paths to access specific messages.
 instance Table MessageT where
-  data PrimaryKey MessageT f = MessageId (Columnar f Text) deriving Generic
+  data PrimaryKey MessageT f = MessageId (Columnar f UTCTime) deriving Generic
   primaryKey = MessageId . _messageTs
 instance Beamable (PrimaryKey MessageT)
 
@@ -105,8 +112,25 @@ instance FromJSON Profile where
   parseJSON = genericParseJSON fieldLabelMod
 instance FromJSON Channel where
   parseJSON = genericParseJSON fieldLabelMod
+-- instance FromJSON Message where
+--  parseJSON = genericParseJSON fieldLabelMod
+
 instance FromJSON Message where
-  parseJSON = genericParseJSON fieldLabelMod
+  parseJSON = withObject "message" $ \o -> do
+    type_ <- o .: "type"
+    subtype <- o .:? "subtype"
+    user <- o .:? "user"
+    botid <- o .:? "bot_id"
+    txt <- o .: "text"
+    msgid <- o .:? "client_msg_id"
+    ts' :: Text <- o .: "ts"
+    case readMaybe (T.unpack ts') of
+      Nothing -> error $ "Invalid ts: " <> T.unpack ts'
+      Just (ts :: Double) -> do
+        -- TODO: Replace round with something that's accurate in conversion.
+        let time = posixSecondsToUTCTime $ fromInteger $ round ts
+        pure $ Message type_ subtype user botid txt msgid time
+
 
 instance ToJSON User where
   toJSON = genericToJSON fieldLabelMod
