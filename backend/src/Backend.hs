@@ -44,24 +44,22 @@ backend = Backend
       liftIO populateDatabase
       serve $ \case
         BackendRoute_GetMessages :=> Identity day -> do
-          -- TODO: avoid duplicating this
-          let dbFile = rootDir <> "/data.sqlite3"
-              fromDate = UTCTime day 0
+          let fromDate = UTCTime day 0
               toDate = UTCTime (addDays 1 day) 0
-          liftIO $ print toDate
           msgs :: [Message] <- liftIO $ SQLite.withConnection dbFile $ \conn -> do
             runBeamSqlite conn $ 
               runSelectReturningList $ 
               select $ do
-                user <- 
-                  filter_ (\msg -> (_messageTs msg >=. val_ fromDate) &&. (_messageTs msg <. val_ toDate)) $ 
+                filter_ (\msg -> (_messageTs msg >=. val_ fromDate) &&. (_messageTs msg <. val_ toDate)) $ 
                   all_ (_slackMessages slackDb)
-                pure user
           writeLBS $ encode msgs
   }
 
 rootDir :: String
 rootDir = "/home/srid/code/Taut/tmp"
+
+dbFile :: String 
+dbFile = rootDir <> "/data.sqlite3"
 
 data SlackDb f = SlackDb
   { _slackChannels :: f (TableEntity ChannelT)
@@ -102,7 +100,6 @@ populateDatabase = do
 
   messages <- fmap join $ traverse channelMessages channels
 
-  let dbFile = rootDir <> "/data.sqlite3"
   doesFileExist dbFile >>= flip when (removeFile dbFile)
 
   putStrLn $ "Loading " <> show (length messages) <> " messages into " <> dbFile
