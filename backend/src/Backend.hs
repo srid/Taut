@@ -77,20 +77,21 @@ loadFile :: FromJSON a => String -> IO a
 loadFile = B.readFile >=> either error return . eitherDecode
 
 channelMessages :: Channel -> IO [Message]
-channelMessages = msgFiles >=> fmap join . traverse loadFile
+channelMessages channel = msgFiles >>= fmap join . traverse loadFile >>= pure . fmap setChannel
   where
-    msgFiles channel = do
+    msgFiles = do
       let c = T.unpack $ _channelName channel
       listDirectory (rootDir </> c)
         <&> filter (isSuffixOf ".json")
         <&> fmap ((rootDir </> c) </>)
+    setChannel msg = msg  { _messageChannelName = Just $ _channelName channel }
 
 -- TODO: Figure out a better way to do this. beam-migrate?
 schema :: [SQLite.Query]
 schema =
   [ "CREATE TABLE channels (id VARCHAR NOT NULL, name VARCHAR NOT NULL, created VARCHAR NOT NULL, PRIMARY KEY( id ));"
   , "CREATE TABLE users (id VARCHAR NOT NULL, team_id VARCHAR NOT NULL, name VARCHAR NOT NULL, deleted BOOL NOT NULL, color VARCHAR, real_name VARCHAR, tz VARCHAR, tz_label VARCHAR, tz_offset INTEGER, PRIMARY KEY( id ));"
-  , "CREATE TABLE messages (id INTEGER PRIMARY KEY, type VARCHAR NOT NULL, subtype VARCHAR, user VARCHAR, bot_id VARCHAR, text VARCHAR NOT NULL, client_msg_id VARCHAR, ts INT NOT NULL);"
+  , "CREATE TABLE messages (id INTEGER PRIMARY KEY, type VARCHAR NOT NULL, subtype VARCHAR, user VARCHAR, bot_id VARCHAR, text VARCHAR NOT NULL, client_msg_id VARCHAR, ts INT NOT NULL, channel_name VARCHAR);"
   ]
 
 populateDatabase :: IO ()
@@ -130,3 +131,4 @@ populateDatabase = do
       (val_ $ _messageText m)
       (val_ $ _messageClientMsgId m)
       (val_ $ _messageTs m)
+      (val_ $ _messageChannelName m)

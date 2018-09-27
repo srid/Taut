@@ -67,7 +67,9 @@ type ChannelId = PrimaryKey ChannelT Identity
 
 instance Beamable ChannelT
 deriving instance Show Channel
+deriving instance Show ChannelId
 deriving instance Eq Channel
+deriving instance Eq ChannelId
 
 instance Table ChannelT where
   data PrimaryKey ChannelT f = ChannelId (Columnar f Text) deriving Generic
@@ -84,6 +86,9 @@ data MessageT f = Message
   , _messageText :: Columnar f Text
   , _messageClientMsgId :: Columnar f (Maybe Text) -- XXX: This can be empty?
   , _messageTs :: Columnar f UTCTime
+  -- Ideally this column should be a foreign key (via Beam's PrimaryKey), but that interferes with json 
+  -- parsing, so we will just keep it stupid and copy the channel name in here.
+  , _messageChannelName :: Columnar f (Maybe Text)
   }
   deriving (Generic)
 
@@ -119,7 +124,8 @@ instance FromJSON Message where
     txt <- o .: "text"
     msgid <- o .:? "client_msg_id"
     ts <- parseSlackTimestamp =<< o .: "ts"
-    pure $ Message type_ subtype user botid txt msgid ts
+    channelName <- o .:? "channel_name"
+    pure $ Message type_ subtype user botid txt msgid ts channelName
 
 instance ToJSON Message where
   toJSON m = object
@@ -130,6 +136,7 @@ instance ToJSON Message where
     , "text" .= _messageText m
     , "client_msg_id" .= _messageClientMsgId m
     , "ts" .= formatSlackTimestamp (_messageTs m)
+    , "channel_name" .= _messageChannelName m
     ]
 
 instance ToJSON User where
