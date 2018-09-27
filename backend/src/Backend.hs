@@ -44,6 +44,7 @@ backend = Backend
       liftIO populateDatabase
       serve $ \case
         BackendRoute_GetMessages :=> Identity day -> do
+          -- TODO: avoid duplicating this
           let dbFile = rootDir <> "/data.sqlite3"
               fromDate = UTCTime day 0
               toDate = UTCTime (addDays 1 day) 0

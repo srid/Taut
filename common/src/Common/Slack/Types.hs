@@ -1,7 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -12,10 +11,7 @@ module Common.Slack.Types where
 
 import Data.Aeson
 import Data.Text (Text)
-import qualified Data.Text as T
 import Data.Time.Clock
-import Data.Time.Clock.POSIX
-import Text.Read (readMaybe)
 
 import Database.Beam
 
@@ -100,8 +96,8 @@ deriving instance Eq Message
 
 -- Timestamps in Slack export archives are precise enough (eg:
 -- "1514808718.000015") to be treated as primary keys, such as to allow us to
--- use them in the URL paths to access specific messages.
--- TODO: Review this comment re: UTCTime type.
+-- use them in the URL paths to access specific messages. See however the note in
+-- Internal.hs about possible invalidation of this quality during convertion to UTCTime.
 instance Table MessageT where
   data PrimaryKey MessageT f = MessageId (Columnar f UTCTime) deriving Generic
   primaryKey = MessageId . _messageTs
@@ -122,30 +118,19 @@ instance FromJSON Message where
     botid <- o .:? "bot_id"
     txt <- o .: "text"
     msgid <- o .:? "client_msg_id"
-    ts' :: Text <- o .: "ts"
-    -- TODO: why readMaybe instead of json parsing directly into double?
-    case readMaybe (T.unpack ts') of
-      Nothing -> error $ "Invalid ts: " <> T.unpack ts'
-      Just (ts :: Double) -> do
-        -- TODO: Replace round with something that's accurate in conversion.
-        let time = posixSecondsToUTCTime $ fromInteger $ round ts
-        pure $ Message type_ subtype user botid txt msgid time
+    ts <- parseSlackTimestamp =<< o .: "ts"
+    pure $ Message type_ subtype user botid txt msgid ts
 
-instance ToJSON Message where 
-  toJSON m = object 
-    [ "type" .= _messageType m 
-    , "subtype" .= _messageSubtype m 
-    , "user" .= _messageUser m 
-    , "bot_id" .= _messageBotId m 
-    , "text" .= _messageText m 
+instance ToJSON Message where
+  toJSON m = object
+    [ "type" .= _messageType m
+    , "subtype" .= _messageSubtype m
+    , "user" .= _messageUser m
+    , "bot_id" .= _messageBotId m
+    , "text" .= _messageText m
     , "client_msg_id" .= _messageClientMsgId m
-    , "ts" .= toSlackTs (_messageTs m)
+    , "ts" .= formatSlackTimestamp (_messageTs m)
     ]
-    where 
-      -- TODO: Check if this converts back to the same value 
-      -- NOTE: it does not; loses the double precision. do we care?
-      toSlackTs :: UTCTime -> Text
-      toSlackTs t = T.pack $ show $ (realToFrac (utcTimeToPOSIXSeconds t) :: Double)
 
 instance ToJSON User where
   toJSON = genericToJSON fieldLabelMod
