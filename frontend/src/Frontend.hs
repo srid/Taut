@@ -46,7 +46,7 @@ frontend = Frontend
               pb <- getPostBuild
               -- TODO: don't hardcode url?
               v' :: Event t (Maybe Int) <- prerender (pure never) $ 
-                getAndDecode $ "/get-messages/2017/04/07" <$ pb
+                getAndDecode $ urlForBackendGetMessages (fromGregorian 2017 4 7) <$ pb
               widgetHold_ (text "Loading") $ ffor v' $ \v -> text $ "We received: " <> T.pack (show v)
         divClass "ui bottom attached secondary segment" $ do
           el "p" $ text "This is a work in progress"
