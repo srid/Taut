@@ -42,12 +42,12 @@ frontend = Frontend
           Route_Messages -> do
             r :: Dynamic t Day <- askRoute
             dyn_ $ ffor r $ \day -> do
-              el "p" $ do
+              el "h1" $ do
                 text "Messages for: "
                 text $ T.pack $ show day
               pb <- getPostBuild
               v' :: Event t (Maybe [Message]) <- prerender (pure never) $ 
-                getAndDecode $ urlForBackendGetMessages (fromGregorian 2017 4 7) <$ pb
+                getAndDecode $ urlForBackendGetMessages day <$ pb
               widgetHold_ (text "Loading") $ ffor v' $ \case 
                 Nothing -> text "No data" 
                 Just msgs -> do 

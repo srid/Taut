@@ -21,6 +21,8 @@ import Data.Monoid ((<>))
 import qualified Data.Text as T
 import System.Directory
 import System.FilePath ((</>))
+import Data.Time.Clock
+import Data.Time.Calendar
 
 import Control.Lens.Operators ((<&>))
 import Database.Beam
@@ -41,13 +43,18 @@ backend = Backend
   , _backend_run = \serve -> do
       liftIO populateDatabase
       serve $ \case
-        BackendRoute_GetMessages :=> Identity _day -> do
+        BackendRoute_GetMessages :=> Identity day -> do
           let dbFile = rootDir <> "/data.sqlite3"
+              fromDate = UTCTime day 0
+              toDate = UTCTime (addDays 1 day) 0
+          liftIO $ print toDate
           msgs :: [Message] <- liftIO $ SQLite.withConnection dbFile $ \conn -> do
             runBeamSqlite conn $ 
               runSelectReturningList $ 
               select $ do
-                user <- limit_ 10 $ all_ (_slackMessages slackDb)
+                user <- 
+                  filter_ (\msg -> (_messageTs msg >=. val_ fromDate) &&. (_messageTs msg <. val_ toDate)) $ 
+                  all_ (_slackMessages slackDb)
                 pure user
           writeLBS $ encode msgs
   }
