@@ -18,6 +18,7 @@ import Data.Some (Some)
 import qualified Data.Some as Some
 import Data.Text (Text)
 import qualified Data.Text as T
+import Data.Time.Calendar
 
 import Obelisk.Route
 import Obelisk.Route.TH
@@ -42,7 +43,7 @@ data BackendRoute :: * -> * where
 
 data Route :: * -> * where
   Route_Home :: Route ()
-  Route_Messages :: Route (Int, Int, Int)   -- TODO: Use actual day type
+  Route_Messages :: Route Day
 
 backendRouteComponentEncoder :: (MonadError Text check, MonadError Text parse) => Encoder check parse (Some BackendRoute) (Maybe Text)
 backendRouteComponentEncoder = enumEncoder $ \case
@@ -66,7 +67,7 @@ routeRestEncoder = Encoder . pure . \case
   Route_Home -> endValidEncoder mempty
   Route_Messages -> dateEncoder
 
-dateEncoder :: MonadError Text parse => ValidEncoder parse (Int, Int, Int) PageName
+dateEncoder :: MonadError Text parse => ValidEncoder parse Day PageName
 dateEncoder = ValidEncoder
   { _validEncoder_decode = \(path, query) ->
       if query == mempty
@@ -74,12 +75,12 @@ dateEncoder = ValidEncoder
         [v] -> pure $ urlToDate v
         _ -> throwError "dateEncoder: expected exactly one path element"
       else throwError "dateEncoder: query was provided"
-  , _validEncoder_encode = \(y, m, d) -> ([dateToUrl (y, m, d)], mempty)
+  , _validEncoder_encode = \day -> ([dateToUrl day], mempty)
   }
   where
     -- TODO: throwError on invalid input
-    dateToUrl (y, m, d) = T.pack $ show y <> "-" <> show m <> "-" <> show d
-    urlToDate s = (read $ T.unpack y, read $ T.unpack m, read $ T.unpack d) where [y, m, d] = T.splitOn "-" s
+    dateToUrl day = T.pack $ show y <> "-" <> show m <> "-" <> show d where (y, m, d) = toGregorian day
+    urlToDate s = fromGregorian (read $ T.unpack y) (read $ T.unpack m) (read $ T.unpack d) where [y, m, d] = T.splitOn "-" s -- TODO: use fromGregorianValid
 
 
 concat <$> mapM deriveRouteComponent

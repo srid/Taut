@@ -18,6 +18,7 @@ library
                , reflex
                , filepath
                , template-haskell
+               , time
                , universe-template
                , beam-core
                , casing

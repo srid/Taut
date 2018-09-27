@@ -8,6 +8,7 @@
 module Frontend where
 
 import qualified Data.Text as T
+import Data.Time.Calendar
 
 import Reflex.Dom.Core
 
@@ -26,7 +27,8 @@ frontend = Frontend
       el "title" $ subRoute_ $ \case
         Route_Home -> text "Taut"
         Route_Messages -> do
-          r :: Dynamic t (Int, Int, Int) <- askRoute
+          r :: Dynamic t Day <- askRoute
+          text "Taut - "
           dynText $ fmap (T.pack . show) r
       elAttr "link" ("rel" =: "stylesheet" <> "type" =: "text/css" <> "href" =: static @"semantic.min.css") blank
   , _frontend_body = do
@@ -36,7 +38,7 @@ frontend = Frontend
         divClass "ui attached segment" $ subRoute_ $ \case
           Route_Home -> el "p" $ text "We'll show your Slack archive here. Hold tight!"
           Route_Messages -> do
-            r :: Dynamic t (Int, Int, Int) <- askRoute
+            r :: Dynamic t Day <- askRoute
             el "p" $ do
               text "Messages for: "
               dynText $ fmap (T.pack . show) r
