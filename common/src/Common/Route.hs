@@ -17,6 +17,7 @@ import Data.Functor.Sum
 import Data.Some (Some)
 import qualified Data.Some as Some
 import Data.Text (Text)
+import qualified Data.Text as T
 
 import Obelisk.Route
 import Obelisk.Route.TH
@@ -41,11 +42,11 @@ data BackendRoute :: * -> * where
 
 data Route :: * -> * where
   Route_Home :: Route ()
-  Route_Page :: Route [Text]
+  Route_Messages :: Route (Int, Int, Int)   -- TODO: Use actual day type
 
 backendRouteComponentEncoder :: (MonadError Text check, MonadError Text parse) => Encoder check parse (Some BackendRoute) (Maybe Text)
 backendRouteComponentEncoder = enumEncoder $ \case
-  Some.This BackendRoute_GetPage-> Just "get-page"
+  Some.This BackendRoute_GetPage -> Just "get-page"
 
 backendRouteRestEncoder :: (Applicative check, MonadError Text parse) => BackendRoute a -> Encoder check parse a PageName
 backendRouteRestEncoder = Encoder . pure . \case
@@ -56,14 +57,30 @@ routeComponentEncoder
   => Encoder check parse (Some Route) (Maybe Text)
 routeComponentEncoder = enumEncoder $ \case
   Some.This Route_Home -> Nothing
-  Some.This Route_Page -> Just "page"
+  Some.This Route_Messages -> Just "messages"
 
 routeRestEncoder
-  :: (Applicative check, MonadError Text parse)
+  :: forall check parse a. (MonadError Text check, MonadError Text parse)
   => Route a -> Encoder check parse a PageName
 routeRestEncoder = Encoder . pure . \case
   Route_Home -> endValidEncoder mempty
-  Route_Page -> pathOnlyValidEncoder
+  Route_Messages -> dateEncoder
+
+dateEncoder :: MonadError Text parse => ValidEncoder parse (Int, Int, Int) PageName
+dateEncoder = ValidEncoder
+  { _validEncoder_decode = \(path, query) ->
+      if query == mempty
+      then case path of
+        [v] -> pure $ urlToDate v
+        _ -> throwError "dateEncoder: expected exactly one path element"
+      else throwError "dateEncoder: query was provided"
+  , _validEncoder_encode = \(y, m, d) -> ([dateToUrl (y, m, d)], mempty)
+  }
+  where
+    -- TODO: throwError on invalid input
+    dateToUrl (y, m, d) = T.pack $ show y <> "-" <> show m <> "-" <> show d
+    urlToDate s = (read $ T.unpack y, read $ T.unpack m, read $ T.unpack d) where [y, m, d] = T.splitOn "-" s
+
 
 concat <$> mapM deriveRouteComponent
   [ ''Route
