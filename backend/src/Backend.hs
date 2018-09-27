@@ -19,15 +19,18 @@ import Data.List (isSuffixOf)
 import Data.List.Split (chunksOf)
 import Data.Monoid ((<>))
 import qualified Data.Text as T
-import Snap
 import System.Directory
 import System.FilePath ((</>))
+import Data.Time.Clock
+import Data.Time.Calendar
 
 import Control.Lens.Operators ((<&>))
 import Database.Beam
 import Database.Beam.Sqlite (runBeamSqlite)
 import Database.Beam.Sqlite.Syntax (SqliteExpressionSyntax)
 import qualified Database.SQLite.Simple as SQLite
+
+import Snap
 
 import Obelisk.Backend as Ob
 
@@ -40,12 +43,23 @@ backend = Backend
   , _backend_run = \serve -> do
       liftIO populateDatabase
       serve $ \case
-        BackendRoute_GetMessages :=> Identity _day -> do
-          writeBS "42"
+        BackendRoute_GetMessages :=> Identity day -> do
+          let fromDate = UTCTime day 0
+              toDate = UTCTime (addDays 1 day) 0
+          msgs :: [Message] <- liftIO $ SQLite.withConnection dbFile $ \conn -> do
+            runBeamSqlite conn $ 
+              runSelectReturningList $ 
+              select $ do
+                filter_ (\msg -> (_messageTs msg >=. val_ fromDate) &&. (_messageTs msg <. val_ toDate)) $ 
+                  all_ (_slackMessages slackDb)
+          writeLBS $ encode msgs
   }
 
 rootDir :: String
 rootDir = "/home/srid/code/Taut/tmp"
+
+dbFile :: String 
+dbFile = rootDir <> "/data.sqlite3"
 
 data SlackDb f = SlackDb
   { _slackChannels :: f (TableEntity ChannelT)
@@ -76,7 +90,7 @@ schema :: [SQLite.Query]
 schema =
   [ "CREATE TABLE channels (id VARCHAR NOT NULL, name VARCHAR NOT NULL, created VARCHAR NOT NULL, PRIMARY KEY( id ));"
   , "CREATE TABLE users (id VARCHAR NOT NULL, team_id VARCHAR NOT NULL, name VARCHAR NOT NULL, deleted BOOL NOT NULL, color VARCHAR, real_name VARCHAR, tz VARCHAR, tz_label VARCHAR, tz_offset INTEGER, PRIMARY KEY( id ));"
-  , "CREATE TABLE messages (id INTEGER PRIMARY KEY, type VARCHAR NOT NULL, subtype VARCHAR, user VARCHAR, bot_id VARCHAR, text VARCHAR NOT NULL, client_msg_id VARCHAR, ts VARCHAR NOT NULL);"
+  , "CREATE TABLE messages (id INTEGER PRIMARY KEY, type VARCHAR NOT NULL, subtype VARCHAR, user VARCHAR, bot_id VARCHAR, text VARCHAR NOT NULL, client_msg_id VARCHAR, ts INT NOT NULL);"
   ]
 
 populateDatabase :: IO ()
@@ -86,7 +100,6 @@ populateDatabase = do
 
   messages <- fmap join $ traverse channelMessages channels
 
-  let dbFile = rootDir <> "/data.sqlite3"
   doesFileExist dbFile >>= flip when (removeFile dbFile)
 
   putStrLn $ "Loading " <> show (length messages) <> " messages into " <> dbFile
@@ -117,4 +130,3 @@ populateDatabase = do
       (val_ $ _messageText m)
       (val_ $ _messageClientMsgId m)
       (val_ $ _messageTs m)
-

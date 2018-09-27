@@ -7,6 +7,7 @@
 {-# LANGUAGE TypeApplications #-}
 module Frontend where
 
+import Control.Monad
 import qualified Data.Text as T
 import Data.Time.Calendar
 
@@ -18,6 +19,7 @@ import Obelisk.Route.Frontend
 import Static
 
 import Common.Route
+import Common.Slack.Types
 
 frontend :: Frontend (R Route)
 frontend = Frontend
@@ -40,14 +42,17 @@ frontend = Frontend
           Route_Messages -> do
             r :: Dynamic t Day <- askRoute
             dyn_ $ ffor r $ \day -> do
-              el "p" $ do
+              el "h1" $ do
                 text "Messages for: "
                 text $ T.pack $ show day
               pb <- getPostBuild
-              -- TODO: don't hardcode url?
-              v' :: Event t (Maybe Int) <- prerender (pure never) $ 
-                getAndDecode $ urlForBackendGetMessages (fromGregorian 2017 4 7) <$ pb
-              widgetHold_ (text "Loading") $ ffor v' $ \v -> text $ "We received: " <> T.pack (show v)
+              v' :: Event t (Maybe [Message]) <- prerender (pure never) $ 
+                getAndDecode $ urlForBackendGetMessages day <$ pb
+              widgetHold_ (text "Loading") $ ffor v' $ \case 
+                Nothing -> text "No data" 
+                Just msgs -> do 
+                  forM_ msgs $ \msg -> do
+                    el "li" $ el "tt" $ text $ T.pack $ show msg
         divClass "ui bottom attached secondary segment" $ do
           el "p" $ text "This is a work in progress"
   , _frontend_notFoundRoute = \_ -> Route_Home :/ () -- TODO: not used i think

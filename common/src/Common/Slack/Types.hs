@@ -1,5 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeSynonymInstances #-}
@@ -9,6 +11,7 @@ module Common.Slack.Types where
 
 import Data.Aeson
 import Data.Text (Text)
+import Data.Time.Clock
 
 import Database.Beam
 
@@ -80,7 +83,7 @@ data MessageT f = Message
   , _messageBotId :: Columnar f (Maybe Text)
   , _messageText :: Columnar f Text
   , _messageClientMsgId :: Columnar f (Maybe Text) -- XXX: This can be empty?
-  , _messageTs :: Columnar f Text -- Timestamp (TODO: parse into Day)
+  , _messageTs :: Columnar f UTCTime
   }
   deriving (Generic)
 
@@ -93,9 +96,10 @@ deriving instance Eq Message
 
 -- Timestamps in Slack export archives are precise enough (eg:
 -- "1514808718.000015") to be treated as primary keys, such as to allow us to
--- use them in the URL paths to access specific messages.
+-- use them in the URL paths to access specific messages. See however the note in
+-- Internal.hs about possible invalidation of this quality during convertion to UTCTime.
 instance Table MessageT where
-  data PrimaryKey MessageT f = MessageId (Columnar f Text) deriving Generic
+  data PrimaryKey MessageT f = MessageId (Columnar f UTCTime) deriving Generic
   primaryKey = MessageId . _messageTs
 instance Beamable (PrimaryKey MessageT)
 
@@ -105,14 +109,32 @@ instance FromJSON Profile where
   parseJSON = genericParseJSON fieldLabelMod
 instance FromJSON Channel where
   parseJSON = genericParseJSON fieldLabelMod
+
 instance FromJSON Message where
-  parseJSON = genericParseJSON fieldLabelMod
+  parseJSON = withObject "message" $ \o -> do
+    type_ <- o .: "type"
+    subtype <- o .:? "subtype"
+    user <- o .:? "user"
+    botid <- o .:? "bot_id"
+    txt <- o .: "text"
+    msgid <- o .:? "client_msg_id"
+    ts <- parseSlackTimestamp =<< o .: "ts"
+    pure $ Message type_ subtype user botid txt msgid ts
+
+instance ToJSON Message where
+  toJSON m = object
+    [ "type" .= _messageType m
+    , "subtype" .= _messageSubtype m
+    , "user" .= _messageUser m
+    , "bot_id" .= _messageBotId m
+    , "text" .= _messageText m
+    , "client_msg_id" .= _messageClientMsgId m
+    , "ts" .= formatSlackTimestamp (_messageTs m)
+    ]
 
 instance ToJSON User where
   toJSON = genericToJSON fieldLabelMod
 instance ToJSON Profile where
   toJSON = genericToJSON fieldLabelMod
 instance ToJSON Channel where
-  toJSON = genericToJSON fieldLabelMod
-instance ToJSON Message where
   toJSON = genericToJSON fieldLabelMod

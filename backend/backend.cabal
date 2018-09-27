@@ -19,6 +19,7 @@ library
                , sqlite-simple
                , split
                , text
+               , time
                , reflex-dom-core
                , obelisk-backend
                , dependent-sum
@@ -55,6 +56,7 @@ executable backend
                , obelisk-executable-config
                , obelisk-executable-config-inject
                , text
+               , time
                , reflex-dom-core
                , obelisk-backend
                , dependent-sum
