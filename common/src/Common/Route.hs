@@ -34,13 +34,13 @@ backendRouteEncoder = Encoder $ do
   myObeliskRestValidEncoder <- checkObeliskRouteRestEncoder routeRestEncoder
   checkEncoder $ pathComponentEncoder myComponentEncoder $ \case
     InL backendRoute -> case backendRoute of
-      BackendRoute_GetPage -> pathOnlyValidEncoder
+      BackendRoute_GetMessages -> dayEncoder
     InR obeliskRoute -> runValidEncoderFunc myObeliskRestValidEncoder obeliskRoute
 
 --TODO: Should we rename `Route` to `AppRoute`?
 data BackendRoute :: * -> * where
   --TODO: How do we do routes with strongly-typed results?
-  BackendRoute_GetPage :: BackendRoute [Text]
+  BackendRoute_GetMessages :: BackendRoute Day
 
 data Route :: * -> * where
   Route_Home :: Route ()
@@ -48,11 +48,11 @@ data Route :: * -> * where
 
 backendRouteComponentEncoder :: (MonadError Text check, MonadError Text parse) => Encoder check parse (Some BackendRoute) (Maybe Text)
 backendRouteComponentEncoder = enumEncoder $ \case
-  Some.This BackendRoute_GetPage -> Just "get-page"
+  Some.This BackendRoute_GetMessages -> Just "get-messages"
 
 backendRouteRestEncoder :: (Applicative check, MonadError Text parse) => BackendRoute a -> Encoder check parse a PageName
 backendRouteRestEncoder = Encoder . pure . \case
-  BackendRoute_GetPage -> pathOnlyValidEncoder
+  BackendRoute_GetMessages -> dayEncoder
 
 routeComponentEncoder
   :: (MonadError Text check, MonadError Text parse)
@@ -73,9 +73,7 @@ dayEncoder = ValidEncoder
   { _validEncoder_decode = \(path, _query) -> case path of
       [y, m, d] -> maybe (throwError "dayEncoder: invalid day") pure $ parseDay y m d
       _ -> throwError "dayEncoder: expected exactly 3 path elements"
-  , _validEncoder_encode = \day ->
-      let (y, m, d) = toGregorian day
-      in ([T.pack $ show y, T.pack $ show m, T.pack $ show d], mempty)
+  , _validEncoder_encode = \day -> (encodeDay day, mempty)
   }
   where
     parseDay y' m' d' = do
@@ -83,6 +81,18 @@ dayEncoder = ValidEncoder
       m <- readMaybe $ T.unpack m'
       d <- readMaybe $ T.unpack d'
       fromGregorianValid y m d
+
+-- TODO: Make this generic at the routes level. 
+--
+-- Specifically we need a function `R BackendRoute -> Text` but I know only of
+-- `BackendRoute () -> Text`.
+urlForBackendGetMessages :: Day -> Text 
+urlForBackendGetMessages day = T.intercalate "/" $ ["get-messages"] <> encodeDay day
+
+encodeDay :: Day -> [Text]
+encodeDay day = [T.pack $ show y, T.pack $ show m, T.pack $ show d]
+  where 
+    (y, m, d) = toGregorian day
 
 
 concat <$> mapM deriveRouteComponent

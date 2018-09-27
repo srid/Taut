@@ -39,9 +39,15 @@ frontend = Frontend
           Route_Home -> el "p" $ text "We'll show your Slack archive here. Hold tight!"
           Route_Messages -> do
             r :: Dynamic t Day <- askRoute
-            el "p" $ do
-              text "Messages for: "
-              dynText $ fmap (T.pack . show) r
+            dyn_ $ ffor r $ \day -> do
+              el "p" $ do
+                text "Messages for: "
+                text $ T.pack $ show day
+              pb <- getPostBuild
+              -- TODO: don't hardcode url?
+              v' :: Event t (Maybe Int) <- prerender (pure never) $ 
+                getAndDecode $ urlForBackendGetMessages (fromGregorian 2017 4 7) <$ pb
+              widgetHold_ (text "Loading") $ ffor v' $ \v -> text $ "We received: " <> T.pack (show v)
         divClass "ui bottom attached secondary segment" $ do
           el "p" $ text "This is a work in progress"
   , _frontend_notFoundRoute = \_ -> Route_Home :/ () -- TODO: not used i think
