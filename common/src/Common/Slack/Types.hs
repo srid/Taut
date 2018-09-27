@@ -101,6 +101,7 @@ deriving instance Eq Message
 -- Timestamps in Slack export archives are precise enough (eg:
 -- "1514808718.000015") to be treated as primary keys, such as to allow us to
 -- use them in the URL paths to access specific messages.
+-- TODO: Review this comment re: UTCTime type.
 instance Table MessageT where
   data PrimaryKey MessageT f = MessageId (Columnar f UTCTime) deriving Generic
   primaryKey = MessageId . _messageTs
@@ -112,8 +113,6 @@ instance FromJSON Profile where
   parseJSON = genericParseJSON fieldLabelMod
 instance FromJSON Channel where
   parseJSON = genericParseJSON fieldLabelMod
--- instance FromJSON Message where
---  parseJSON = genericParseJSON fieldLabelMod
 
 instance FromJSON Message where
   parseJSON = withObject "message" $ \o -> do
@@ -124,6 +123,7 @@ instance FromJSON Message where
     txt <- o .: "text"
     msgid <- o .:? "client_msg_id"
     ts' :: Text <- o .: "ts"
+    -- TODO: why readMaybe instead of json parsing directly into double?
     case readMaybe (T.unpack ts') of
       Nothing -> error $ "Invalid ts: " <> T.unpack ts'
       Just (ts :: Double) -> do
@@ -131,6 +131,7 @@ instance FromJSON Message where
         let time = posixSecondsToUTCTime $ fromInteger $ round ts
         pure $ Message type_ subtype user botid txt msgid time
 
+-- TODO: Implement ToJSON that converts to the same ts. Uhh.
 
 instance ToJSON User where
   toJSON = genericToJSON fieldLabelMod

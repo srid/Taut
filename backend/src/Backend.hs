@@ -19,7 +19,6 @@ import Data.List (isSuffixOf)
 import Data.List.Split (chunksOf)
 import Data.Monoid ((<>))
 import qualified Data.Text as T
-import Snap
 import System.Directory
 import System.FilePath ((</>))
 
@@ -28,6 +27,8 @@ import Database.Beam
 import Database.Beam.Sqlite (runBeamSqlite)
 import Database.Beam.Sqlite.Syntax (SqliteExpressionSyntax)
 import qualified Database.SQLite.Simple as SQLite
+
+import Snap
 
 import Obelisk.Backend as Ob
 
@@ -39,9 +40,18 @@ backend = Backend
   { _backend_routeEncoder = backendRouteEncoder
   , _backend_run = \serve -> do
       liftIO populateDatabase
+      q <- liftIO $ pure $ do 
+        let dbFile = rootDir <> "/data.sqlite3"
+        SQLite.withConnection dbFile $ \conn -> do
+          runBeamSqlite conn $ 
+            runSelectReturningList $ 
+            select $ do
+              user <- limit_ 10 $ all_ (_slackMessages slackDb)
+              pure user
       serve $ \case
         BackendRoute_GetMessages :=> Identity _day -> do
-          writeBS "42"
+          msgs :: [Message] <- liftIO q
+          writeLBS $ encode msgs
   }
 
 rootDir :: String
