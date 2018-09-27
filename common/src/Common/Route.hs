@@ -17,6 +17,9 @@ import Data.Functor.Sum
 import Data.Some (Some)
 import qualified Data.Some as Some
 import Data.Text (Text)
+import qualified Data.Text as T
+import Data.Time.Calendar
+import Text.Read (readMaybe)
 
 import Obelisk.Route
 import Obelisk.Route.TH
@@ -41,11 +44,11 @@ data BackendRoute :: * -> * where
 
 data Route :: * -> * where
   Route_Home :: Route ()
-  Route_Page :: Route [Text]
+  Route_Messages :: Route Day
 
 backendRouteComponentEncoder :: (MonadError Text check, MonadError Text parse) => Encoder check parse (Some BackendRoute) (Maybe Text)
 backendRouteComponentEncoder = enumEncoder $ \case
-  Some.This BackendRoute_GetPage-> Just "get-page"
+  Some.This BackendRoute_GetPage -> Just "get-page"
 
 backendRouteRestEncoder :: (Applicative check, MonadError Text parse) => BackendRoute a -> Encoder check parse a PageName
 backendRouteRestEncoder = Encoder . pure . \case
@@ -56,14 +59,31 @@ routeComponentEncoder
   => Encoder check parse (Some Route) (Maybe Text)
 routeComponentEncoder = enumEncoder $ \case
   Some.This Route_Home -> Nothing
-  Some.This Route_Page -> Just "page"
+  Some.This Route_Messages -> Just "messages"
 
 routeRestEncoder
-  :: (Applicative check, MonadError Text parse)
+  :: forall check parse a. (MonadError Text check, MonadError Text parse)
   => Route a -> Encoder check parse a PageName
 routeRestEncoder = Encoder . pure . \case
   Route_Home -> endValidEncoder mempty
-  Route_Page -> pathOnlyValidEncoder
+  Route_Messages -> dayEncoder
+
+dayEncoder :: MonadError Text parse => ValidEncoder parse Day PageName
+dayEncoder = ValidEncoder
+  { _validEncoder_decode = \(path, _query) -> case path of
+      [y, m, d] -> maybe (throwError "dayEncoder: invalid day") pure $ parseDay y m d
+      _ -> throwError "dayEncoder: expected exactly 3 path elements"
+  , _validEncoder_encode = \day ->
+      let (y, m, d) = toGregorian day
+      in ([T.pack $ show y, T.pack $ show m, T.pack $ show d], mempty)
+  }
+  where
+    parseDay y' m' d' = do
+      y <- readMaybe $ T.unpack y'
+      m <- readMaybe $ T.unpack m'
+      d <- readMaybe $ T.unpack d'
+      fromGregorianValid y m d
+
 
 concat <$> mapM deriveRouteComponent
   [ ''Route

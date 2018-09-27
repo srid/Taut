@@ -14,6 +14,7 @@ library
                , obelisk-route
                , obelisk-frontend
                , clay
+               , time
                , modern-uri
                , jsaddle
                , mtl
