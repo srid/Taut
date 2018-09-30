@@ -46,11 +46,11 @@ frontend = Frontend
                 text "Messages for: "
                 text $ T.pack $ show day
               pb <- getPostBuild
-              v' :: Event t (Maybe [Message]) <- prerender (pure never) $ 
+              v' :: Event t (Maybe [Message]) <- prerender (pure never) $
                 getAndDecode $ urlForBackendGetMessages day <$ pb
-              widgetHold_ (text "Loading") $ ffor v' $ \case 
-                Nothing -> text "No data" 
-                Just msgs -> do 
+              widgetHold_ (text "Loading") $ ffor v' $ \case
+                Nothing -> text "No data"
+                Just msgs -> do
                   forM_ msgs $ \msg -> do
                     el "li" $ el "tt" $ text $ T.pack $ show msg
         divClass "ui bottom attached secondary segment" $ do

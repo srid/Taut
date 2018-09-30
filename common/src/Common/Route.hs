@@ -82,16 +82,16 @@ dayEncoder = ValidEncoder
       d <- readMaybe $ T.unpack d'
       fromGregorianValid y m d
 
--- TODO: Make this generic at the routes level. 
+-- TODO: Make this generic at the routes level.
 --
 -- Specifically we need a function `R BackendRoute -> Text` but I know only of
 -- `BackendRoute () -> Text`.
-urlForBackendGetMessages :: Day -> Text 
+urlForBackendGetMessages :: Day -> Text
 urlForBackendGetMessages day = T.intercalate "/" $ ["get-messages"] <> encodeDay day
 
 encodeDay :: Day -> [Text]
 encodeDay day = [T.pack $ show y, T.pack $ show m, T.pack $ show d]
-  where 
+  where
     (y, m, d) = toGregorian day
 
 

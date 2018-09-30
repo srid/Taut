@@ -86,7 +86,7 @@ data MessageT f = Message
   , _messageText :: Columnar f Text
   , _messageClientMsgId :: Columnar f (Maybe Text) -- XXX: This can be empty?
   , _messageTs :: Columnar f UTCTime
-  -- Ideally this column should be a foreign key (via Beam's PrimaryKey), but that interferes with json 
+  -- Ideally this column should be a foreign key (via Beam's PrimaryKey), but that interferes with json
   -- parsing, so we will just keep it stupid and copy the channel name in here.
   , _messageChannelName :: Columnar f (Maybe Text)
   }

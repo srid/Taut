@@ -19,10 +19,10 @@ import Data.List (isSuffixOf)
 import Data.List.Split (chunksOf)
 import Data.Monoid ((<>))
 import qualified Data.Text as T
+import Data.Time.Calendar
+import Data.Time.Clock
 import System.Directory
 import System.FilePath ((</>))
-import Data.Time.Clock
-import Data.Time.Calendar
 
 import Control.Lens.Operators ((<&>))
 import Database.Beam
@@ -47,10 +47,10 @@ backend = Backend
           let fromDate = UTCTime day 0
               toDate = UTCTime (addDays 1 day) 0
           msgs :: [Message] <- liftIO $ SQLite.withConnection dbFile $ \conn -> do
-            runBeamSqlite conn $ 
-              runSelectReturningList $ 
+            runBeamSqlite conn $
+              runSelectReturningList $
               select $ do
-                filter_ (\msg -> (_messageTs msg >=. val_ fromDate) &&. (_messageTs msg <. val_ toDate)) $ 
+                filter_ (\msg -> (_messageTs msg >=. val_ fromDate) &&. (_messageTs msg <. val_ toDate)) $
                   all_ (_slackMessages slackDb)
           writeLBS $ encode msgs
   }
@@ -58,7 +58,7 @@ backend = Backend
 rootDir :: String
 rootDir = "/home/srid/code/Taut/tmp"
 
-dbFile :: String 
+dbFile :: String
 dbFile = rootDir <> "/data.sqlite3"
 
 data SlackDb f = SlackDb
