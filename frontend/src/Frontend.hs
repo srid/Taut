@@ -8,7 +8,10 @@
 module Frontend where
 
 import Control.Monad
-import Data.Maybe (fromMaybe, isJust)
+import Data.Foldable (foldl')
+import qualified Data.Map as Map
+import Data.Maybe (isJust)
+import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time.Calendar
 
@@ -47,21 +50,26 @@ frontend = Frontend
                 text "Messages for: "
                 text $ T.pack $ show day
               pb <- getPostBuild
-              v' :: Event t (Maybe [Message]) <- prerender (pure never) $
+              v' :: Event t (Maybe ([User], [Message])) <- prerender (pure never) $
                 getAndDecode $ urlForBackendGetMessages day <$ pb
               widgetHold_ (text "Loading") $ ffor v' $ \case
                 Nothing -> text "No data"
-                Just msgs -> divClass "ui comments" $ do
-                  forM_ (filter (isJust . _messageChannelName) msgs) $ \msg -> do
-                    divClass "comment" $ do
-                      divClass "content" $ do
-                        elClass "a" "author" $ text $ fromMaybe "Nobody" $_messageUser msg
-                        divClass "metadata" $ do
-                          divClass "date" $ text $ T.pack $ show $ _messageTs msg
-                        divClass "text" $ do
-                          text $ _messageText msg
-                        el "tt" $ text $ T.pack $ show msg
+                Just (users', msgs) -> divClass "ui comments" $ do
+                  let users = Map.fromList $ ffor users' $ \u -> (_userId u, _userName u)
+                  forM_ (filter (isJust . _messageChannelName) msgs) $ singleMessage users
         divClass "ui bottom attached secondary segment" $ do
           el "p" $ text "This is a work in progress"
   , _frontend_notFoundRoute = \_ -> Route_Home :/ () -- TODO: not used i think
   }
+
+singleMessage :: DomBuilder t m => Map.Map Text Text -> Message -> m ()
+singleMessage users msg = do
+  divClass "comment" $ do
+    divClass "content" $ do
+      elClass "a" "author" $ text $ maybe "Nobody" (\u -> Map.findWithDefault "Unknown" u users) $ _messageUser msg
+      divClass "metadata" $ do
+        divClass "date" $ text $ T.pack $ show $ _messageTs msg
+      elAttr "div" ("class" =: "text" <> "title" =: T.pack (show msg)) $ do
+        text $ renderText $ _messageText msg
+  where
+    renderText s = foldl' (\m (userId, userName) -> T.replace userId userName m) s (Map.toList users)

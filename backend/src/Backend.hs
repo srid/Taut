@@ -46,13 +46,17 @@ backend = Backend
         BackendRoute_GetMessages :=> Identity day -> do
           let fromDate = UTCTime day 0
               toDate = UTCTime (addDays 1 day) 0
-          msgs :: [Message] <- liftIO $ SQLite.withConnection dbFile $ \conn -> do
-            runBeamSqlite conn $
+          resp <- liftIO $ SQLite.withConnection dbFile $ \conn -> do
+            msgs :: [Message] <- runBeamSqlite conn $
               runSelectReturningList $
               select $ do
                 filter_ (\msg -> (_messageTs msg >=. val_ fromDate) &&. (_messageTs msg <. val_ toDate)) $
                   all_ (_slackMessages slackDb)
-          writeLBS $ encode msgs
+            users :: [User] <- runBeamSqlite conn $
+              runSelectReturningList $
+              select $ all_ (_slackUsers slackDb)
+            pure (users, msgs)
+          writeLBS $ encode resp
   }
 
 rootDir :: String
