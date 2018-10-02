@@ -8,6 +8,7 @@
 module Frontend where
 
 import Control.Monad
+import Data.Maybe (fromMaybe, isJust)
 import qualified Data.Text as T
 import Data.Time.Calendar
 
@@ -50,9 +51,16 @@ frontend = Frontend
                 getAndDecode $ urlForBackendGetMessages day <$ pb
               widgetHold_ (text "Loading") $ ffor v' $ \case
                 Nothing -> text "No data"
-                Just msgs -> do
-                  forM_ msgs $ \msg -> do
-                    el "li" $ el "tt" $ text $ T.pack $ show msg
+                Just msgs -> divClass "ui comments" $ do
+                  forM_ (filter (isJust . _messageChannelName) msgs) $ \msg -> do
+                    divClass "comment" $ do
+                      divClass "content" $ do
+                        elClass "a" "author" $ text $ fromMaybe "Nobody" $_messageUser msg
+                        divClass "metadata" $ do
+                          divClass "date" $ text $ T.pack $ show $ _messageTs msg
+                        divClass "text" $ do
+                          text $ _messageText msg
+                        el "tt" $ text $ T.pack $ show msg
         divClass "ui bottom attached secondary segment" $ do
           el "p" $ text "This is a work in progress"
   , _frontend_notFoundRoute = \_ -> Route_Home :/ () -- TODO: not used i think
