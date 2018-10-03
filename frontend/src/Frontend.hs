@@ -11,9 +11,12 @@ import Control.Monad
 import Data.Foldable (foldl')
 import qualified Data.Map as Map
 import Data.Maybe (isJust)
+import Data.Monoid hiding (Sum, (<>))
+import Data.Semigroup ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time.Calendar
+import Text.Printf (printf)
 
 import Reflex.Dom.Core
 
@@ -46,9 +49,14 @@ frontend = Frontend
           Route_Messages -> do
             r :: Dynamic t Day <- askRoute
             dyn_ $ ffor r $ \day -> do
+              selectedDate <- fmap value $ inputElement $ def
+                & initialAttributes .~ ("type" =: "date")
+                & inputElementConfig_initialValue .~ toDateInputVal day
+              tellEvent $ ffor (updated selectedDate) $ \v ->
+                Endo $ const $ Route_Messages :/ parseDateInput v
               el "h1" $ do
                 text "Messages for: "
-                text $ T.pack $ show day
+                text $ toDateInputVal day
               pb <- getPostBuild
               v' :: Event t (Maybe ([User], [Message])) <- prerender (pure never) $
                 getAndDecode $ urlForBackendGetMessages day <$ pb
@@ -61,6 +69,14 @@ frontend = Frontend
           el "p" $ text "This is a work in progress"
   , _frontend_notFoundRoute = \_ -> Route_Home :/ () -- TODO: not used i think
   }
+  where
+    toDateInputVal day = T.pack $ printf "%d-%02d-%02d" y m d
+      where
+        (y, m, d) = toGregorian day
+    parseDateInput val =
+      fromGregorian (read $ T.unpack y) (read $ T.unpack m) (read $ T.unpack d)
+      where
+        [y, m, d] = T.splitOn "-" val
 
 singleMessage :: DomBuilder t m => Map.Map Text Text -> Message -> m ()
 singleMessage users msg = do
