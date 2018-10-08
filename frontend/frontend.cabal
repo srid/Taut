@@ -14,6 +14,7 @@ library
                , obelisk-route
                , obelisk-frontend
                , clay
+               , containers
                , time
                , modern-uri
                , jsaddle
@@ -35,6 +36,7 @@ executable frontend
                , obelisk-route
                , obelisk-frontend
                , clay
+               , containers
                , time
                , modern-uri
                , jsaddle
