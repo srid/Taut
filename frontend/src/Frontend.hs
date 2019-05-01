@@ -10,7 +10,7 @@ module Frontend where
 import Control.Monad
 import Data.Foldable (foldl')
 import qualified Data.Map as Map
-import Data.Maybe (isJust)
+import Data.Maybe (fromMaybe, isJust)
 import Data.Semigroup ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -63,10 +63,10 @@ frontend = Frontend
                 pb <- getPostBuild
                 let fetchApi = traceEvent "fetchApi" $ urlForBackendGetMessages day <$ pb
                 getAndDecode fetchApi
-              widgetHold_ (text "Loading") $ ffor v' $ \case
-                Nothing -> text "No data"
+              widgetHold_ (divClass "ui loading segment" blank) $ ffor v' $ divClass "ui segment" . \case
+                Nothing -> text "Something went wrong"
                 Just (users', msgs)
-                  | msgs == [] -> divClass "ui segment" $ text "No messages for this day; try another day"
+                  | msgs == [] -> text "No messages for this day; try another day"
                   | otherwise -> divClass "ui comments" $ do
                   let users = Map.fromList $ ffor users' $ \u -> (_userId u, _userName u)
                   forM_ (filter (isJust . _messageChannelName) msgs) $ singleMessage users
@@ -78,7 +78,7 @@ frontend = Frontend
               --  routeLink (Route_Messages :/ parseDateInput v) $ text "Go"
 
         divClass "ui bottom attached secondary segment" $ do
-          el "p" $ text "This is a work in progress"
+          elAttr "a" ("href" =: "https://github.com/srid/Taut") $ text "Powered by Haskell"
   }
   where
     toDateInputVal day = T.pack $ printf "%d-%02d-%02d" y m d
@@ -93,8 +93,10 @@ singleMessage :: DomBuilder t m => Map.Map Text Text -> Message -> m ()
 singleMessage users msg = do
   divClass "comment" $ do
     divClass "content" $ do
-      elClass "a" "author" $ text $ maybe "Nobody" (\u -> Map.findWithDefault "Unknown" u users) $ _messageUser msg
+      elClass "a" "author" $ do
+        text $ maybe "Nobody" (\u -> Map.findWithDefault "Unknown" u users) $ _messageUser msg
       divClass "metadata" $ do
+        divClass "room" $ text $ fromMaybe "Unknown Channel" $ fmap ("#" <>) $ _messageChannelName msg
         divClass "date" $ text $ T.pack $ show $ _messageTs msg
       elAttr "div" ("class" =: "text" <> "title" =: T.pack (show msg)) $ do
         text $ renderText $ _messageText msg
