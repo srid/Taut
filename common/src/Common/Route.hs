@@ -11,11 +11,9 @@ module Common.Route where
 
 import Prelude hiding ((.))
 
-import Control.Category
 import Control.Monad.Except
 import Data.Functor.Sum
-import Data.Some (Some)
-import qualified Data.Some as Some
+import Data.Functor.Identity
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time.Calendar
@@ -24,21 +22,10 @@ import Text.Read (readMaybe)
 import Obelisk.Route
 import Obelisk.Route.TH
 
-backendRouteEncoder
-  :: ( check ~ parse
-     , MonadError Text parse
-     )
-  => Encoder check parse (R (Sum BackendRoute (ObeliskRoute Route))) PageName
-backendRouteEncoder = Encoder $ do
-  let myComponentEncoder = (backendRouteComponentEncoder `shadowEncoder` obeliskRouteComponentEncoder routeComponentEncoder) . someSumEncoder
-  myObeliskRestValidEncoder <- checkObeliskRouteRestEncoder routeRestEncoder
-  checkEncoder $ pathComponentEncoder myComponentEncoder $ \case
-    InL backendRoute -> case backendRoute of
-      BackendRoute_GetMessages -> dayEncoder
-    InR obeliskRoute -> runValidEncoderFunc myObeliskRestValidEncoder obeliskRoute
-
 --TODO: Should we rename `Route` to `AppRoute`?
 data BackendRoute :: * -> * where
+  -- | Used to handle unparseable routes.
+  BackendRoute_Missing :: BackendRoute ()
   --TODO: How do we do routes with strongly-typed results?
   BackendRoute_GetMessages :: BackendRoute Day
 
@@ -46,34 +33,26 @@ data Route :: * -> * where
   Route_Home :: Route ()
   Route_Messages :: Route Day
 
-backendRouteComponentEncoder :: (MonadError Text check, MonadError Text parse) => Encoder check parse (Some BackendRoute) (Maybe Text)
-backendRouteComponentEncoder = enumEncoder $ \case
-  Some.This BackendRoute_GetMessages -> Just "get-messages"
+backendRouteEncoder
+  :: Encoder (Either Text) Identity (R (Sum BackendRoute (ObeliskRoute Route))) PageName
+backendRouteEncoder = handleEncoder (const (InL BackendRoute_Missing :/ ())) $
+  pathComponentEncoder $ \case
+    InL backendRoute -> case backendRoute of
+      BackendRoute_Missing -> PathSegment "missing" $ unitEncoder mempty
+      BackendRoute_GetMessages -> PathSegment "get-messages" $ dayEncoder
+    InR obeliskRoute -> obeliskRouteSegment obeliskRoute $ \case
+      -- The encoder given to PathEnd determines how to parse query parameters,
+      -- in this example, we have none, so we insist on it.
+      Route_Home -> PathEnd $ unitEncoder mempty
+      Route_Messages -> PathSegment "messages" $ dayEncoder
 
-backendRouteRestEncoder :: (Applicative check, MonadError Text parse) => BackendRoute a -> Encoder check parse a PageName
-backendRouteRestEncoder = Encoder . pure . \case
-  BackendRoute_GetMessages -> dayEncoder
-
-routeComponentEncoder
-  :: (MonadError Text check, MonadError Text parse)
-  => Encoder check parse (Some Route) (Maybe Text)
-routeComponentEncoder = enumEncoder $ \case
-  Some.This Route_Home -> Nothing
-  Some.This Route_Messages -> Just "messages"
-
-routeRestEncoder
-  :: forall check parse a. (MonadError Text check, MonadError Text parse)
-  => Route a -> Encoder check parse a PageName
-routeRestEncoder = Encoder . pure . \case
-  Route_Home -> endValidEncoder mempty
-  Route_Messages -> dayEncoder
-
-dayEncoder :: MonadError Text parse => ValidEncoder parse Day PageName
-dayEncoder = ValidEncoder
-  { _validEncoder_decode = \(path, _query) -> case path of
+-- TODO: clean this up
+dayEncoder :: (Applicative check, MonadError Text parse) => Encoder check parse Day PageName
+dayEncoder = unsafeMkEncoder $ EncoderImpl
+  { _encoderImpl_decode = \(path, _query) -> case path of
       [y, m, d] -> maybe (throwError "dayEncoder: invalid day") pure $ parseDay y m d
       _ -> throwError "dayEncoder: expected exactly 3 path elements"
-  , _validEncoder_encode = \day -> (encodeDay day, mempty)
+  , _encoderImpl_encode = \day -> (encodeDay day, mempty)
   }
   where
     parseDay y' m' d' = do

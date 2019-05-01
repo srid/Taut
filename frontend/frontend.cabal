@@ -8,11 +8,11 @@ library
   build-depends: base
                , common
                , reflex-dom
-               , static
                , text
                , string-conv
                , obelisk-route
                , obelisk-frontend
+               , obelisk-generated-static
                , clay
                , containers
                , time
@@ -29,12 +29,12 @@ executable frontend
   build-depends: base
                , common
                , reflex-dom
-               , static
                , text
                , frontend
                , string-conv
                , obelisk-route
                , obelisk-frontend
+               , obelisk-generated-static
                , clay
                , containers
                , time

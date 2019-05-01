@@ -43,6 +43,8 @@ backend = Backend
   , _backend_run = \serve -> do
       liftIO populateDatabase
       serve $ \case
+        BackendRoute_Missing :=> Identity () -> do
+          writeLBS "404"
         BackendRoute_GetMessages :=> Identity day -> do
           let fromDate = UTCTime day 0
               toDate = UTCTime (addDays 1 day) 0

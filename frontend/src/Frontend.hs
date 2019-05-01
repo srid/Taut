@@ -11,7 +11,6 @@ import Control.Monad
 import Data.Foldable (foldl')
 import qualified Data.Map as Map
 import Data.Maybe (isJust)
-import Data.Monoid hiding (Sum, (<>))
 import Data.Semigroup ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -23,10 +22,9 @@ import Reflex.Dom.Core
 import Obelisk.Frontend
 import Obelisk.Route.Frontend
 
-import Static
-
 import Common.Route
 import Common.Slack.Types
+import Obelisk.Generated.Static
 
 frontend :: Frontend (R Route)
 frontend = Frontend
@@ -52,13 +50,13 @@ frontend = Frontend
               selectedDate <- fmap value $ inputElement $ def
                 & initialAttributes .~ ("type" =: "date")
                 & inputElementConfig_initialValue .~ toDateInputVal day
-              tellEvent $ ffor (updated selectedDate) $ \v ->
-                Endo $ const $ Route_Messages :/ parseDateInput v
+              widgetHold_ blank $ ffor (updated selectedDate) $ \v ->
+                routeLink (Route_Messages :/ parseDateInput v) $ text "Go"
               el "h1" $ do
                 text "Messages for: "
                 text $ toDateInputVal day
               pb <- getPostBuild
-              v' :: Event t (Maybe ([User], [Message])) <- prerender (pure never) $
+              v' :: Event t (Maybe ([User], [Message])) <- fmap switchDyn $ prerender (pure never) $
                 getAndDecode $ urlForBackendGetMessages day <$ pb
               widgetHold_ (text "Loading") $ ffor v' $ \case
                 Nothing -> text "No data"
@@ -67,7 +65,6 @@ frontend = Frontend
                   forM_ (filter (isJust . _messageChannelName) msgs) $ singleMessage users
         divClass "ui bottom attached secondary segment" $ do
           el "p" $ text "This is a work in progress"
-  , _frontend_notFoundRoute = \_ -> Route_Home :/ () -- TODO: not used i think
   }
   where
     toDateInputVal day = T.pack $ printf "%d-%02d-%02d" y m d
