@@ -28,10 +28,12 @@ data BackendRoute :: * -> * where
   BackendRoute_Missing :: BackendRoute ()
   --TODO: How do we do routes with strongly-typed results?
   BackendRoute_GetMessages :: BackendRoute Day
+  BackendRoute_SearchMessages :: BackendRoute Text
 
 data Route :: * -> * where
   Route_Home :: Route ()
   Route_Messages :: Route Day
+  Route_Search :: Route Text
 
 backendRouteEncoder
   :: Encoder (Either Text) Identity (R (Sum BackendRoute (ObeliskRoute Route))) PageName
@@ -40,11 +42,13 @@ backendRouteEncoder = handleEncoder (const (InL BackendRoute_Missing :/ ())) $
     InL backendRoute -> case backendRoute of
       BackendRoute_Missing -> PathSegment "missing" $ unitEncoder mempty
       BackendRoute_GetMessages -> PathSegment "get-messages" $ dayEncoder
+      BackendRoute_SearchMessages -> PathSegment "search-messages" $ singlePathSegmentEncoder
     InR obeliskRoute -> obeliskRouteSegment obeliskRoute $ \case
       -- The encoder given to PathEnd determines how to parse query parameters,
       -- in this example, we have none, so we insist on it.
       Route_Home -> PathEnd $ unitEncoder mempty
       Route_Messages -> PathSegment "messages" $ dayEncoder
+      Route_Search -> PathSegment "search" $ singlePathSegmentEncoder
 
 -- TODO: clean this up
 dayEncoder :: (Applicative check, MonadError Text parse) => Encoder check parse Day PageName

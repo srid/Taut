@@ -49,45 +49,47 @@ frontend = Frontend
             text "This app is a work in progress. Meanwhile, "
             routeLink (Route_Messages :/ fromGregorian 2019 3 27) $ text "start from 2019/3/27"
             text "?"
+          Route_Search -> do
+            query :: Dynamic t Text <- askRoute
+            el "h1" $ do
+              text "Searching for: "
+              dynText query
+            divClass "ui warning message" $ do
+              divClass "header" $ text "Work in progress"
+              text "Only a subset of results is being displayed"
+            renderMessages =<< getMessages query ("/search-messages/" <>)
           Route_Messages -> do
             r :: Dynamic t Day <- askRoute
             el "h1" $ do
               text "Messages on: "
-              dynText $ traceDyn "HH" $ toDateInputVal <$> r
+              dynText $ toDateInputVal <$> r
             dyn_ $ ffor r $ \day -> do
               routeLink (Route_Messages :/ addDays (-1) day) $ elClass "button" "ui button" $ text "Prev Day"
             dyn_ $ ffor r $ \day -> do
               routeLink (Route_Messages :/ addDays 1 day) $ elClass "button" "ui button" $ text "Next Day"
-            dyn_ $ ffor r $ \day -> do
-              v' :: Event t (Maybe ([User], [Message])) <- fmap switchDyn $ prerender (pure never) $ do
-                pb <- getPostBuild
-                let fetchApi = traceEvent "fetchApi" $ urlForBackendGetMessages day <$ pb
-                getAndDecode fetchApi
-              widgetHold_ (divClass "ui loading segment" blank) $ ffor v' $ divClass "ui segment" . \case
-                Nothing -> text "Something went wrong"
-                Just (users', msgs)
-                  | msgs == [] -> text "No messages for this day; try another day"
-                  | otherwise -> divClass "ui comments" $ do
-                  let users = Map.fromList $ ffor users' $ \u -> (_userId u, _userName u)
-                  forM_ (filter (isJust . _messageChannelName) msgs) $ singleMessage users
-            -- dyn_ $ ffor r $ \day -> do
-              -- selectedDate <- fmap value $ inputElement $ def
-              --   & initialAttributes .~ ("type" =: "date")
-              --   & inputElementConfig_initialValue .~ toDateInputVal day
-              -- widgetHold_ blank $ ffor (updated selectedDate) $ \v ->
-              --  routeLink (Route_Messages :/ parseDateInput v) $ text "Go"
-
+            renderMessages =<< getMessages r urlForBackendGetMessages
         divClass "ui bottom attached secondary segment" $ do
           elAttr "a" ("href" =: "https://github.com/srid/Taut") $ text "Powered by Haskell"
   }
   where
+    getMessages
+      :: (Reflex t, MonadHold t m, PostBuild t m, DomBuilder t m, Prerender js t m)
+      => Dynamic t r -> (r -> Text) -> m (Event t (Maybe ([User], [Message])))
+    getMessages r mkUrl = switchHold never <=< dyn $ ffor r $ \x -> do
+      fmap switchDyn $ prerender (pure never) $ do
+        pb <- getPostBuild
+        getAndDecode $ mkUrl x <$ pb
+    renderMessages msgsE =
+      widgetHold_ (divClass "ui loading segment" blank) $ ffor msgsE $ divClass "ui segment" . \case
+        Nothing -> text "Something went wrong"
+        Just (users', msgs)
+          | msgs == [] -> text "No messages for this day; try another day"
+          | otherwise -> divClass "ui comments" $ do
+          let users = Map.fromList $ ffor users' $ \u -> (_userId u, _userName u)
+          forM_ (filter (isJust . _messageChannelName) msgs) $ singleMessage users
     toDateInputVal day = T.pack $ printf "%d-%02d-%02d" y m d
       where
         (y, m, d) = toGregorian day
-    _parseDateInput val =
-      fromGregorian (read $ T.unpack y) (read $ T.unpack m) (read $ T.unpack d)
-      where
-        [y, m, d] = T.splitOn "-" val
 
 singleMessage :: DomBuilder t m => Map.Map Text Text -> Message -> m ()
 singleMessage users msg = do

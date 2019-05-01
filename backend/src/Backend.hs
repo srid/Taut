@@ -59,6 +59,21 @@ backend = Backend
               select $ all_ (_slackUsers slackDb)
             pure (users, msgs)
           writeLBS $ encode resp
+        BackendRoute_SearchMessages :=> Identity query -> do
+          let sqlQuery = "%" <> query <> "%"
+          resp <- liftIO $ SQLite.withConnection dbFile $ \conn -> do
+            msgs :: [Message] <- runBeamSqlite conn $
+              runSelectReturningList $
+              select $ do
+                limit_ 100 $ orderBy_ (asc_ . _messageTs) $
+                  filter_ (\msg -> (_messageText msg `like_` val_ sqlQuery)) $
+                    all_ (_slackMessages slackDb)
+            -- TODO: separate endpoint for this?
+            users :: [User] <- runBeamSqlite conn $
+              runSelectReturningList $
+              select $ all_ (_slackUsers slackDb)
+            pure (users, msgs)
+          writeLBS $ encode resp
   }
 
 rootDir :: String
