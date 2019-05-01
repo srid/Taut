@@ -45,20 +45,19 @@ frontend = Frontend
         divClass "ui top attached inverted header" $ do
           text "Taut"
         divClass "ui attached segment" $ subRoute_ $ \case
-          Route_Home -> el "p" $ text "We'll show your Slack archive here. Hold tight!"
+          Route_Home -> el "p" $ do
+            text "This app is a work in progress. Meanwhile, "
+            routeLink (Route_Messages :/ fromGregorian 2019 3 27) $ text "start from 2019/3/27"
+            text "?"
           Route_Messages -> do
             r :: Dynamic t Day <- askRoute
             el "h1" $ do
               text "Messages on: "
               dynText $ traceDyn "HH" $ toDateInputVal <$> r
             dyn_ $ ffor r $ \day -> do
-              let (y, m, d) = toGregorian day
-                  n = fromGregorian y m (d - 1) -- FIXME
-              routeLink (Route_Messages :/ n) $ text "Prev"
+              routeLink (Route_Messages :/ addDays (-1) day) $ elClass "button" "ui button" $ text "Prev Day"
             dyn_ $ ffor r $ \day -> do
-              let (y, m, d) = toGregorian day
-                  n = fromGregorian y m (d + 1) -- FIXME
-              routeLink (Route_Messages :/ n) $ text "Next"
+              routeLink (Route_Messages :/ addDays 1 day) $ elClass "button" "ui button" $ text "Next Day"
             dyn_ $ ffor r $ \day -> do
               v' :: Event t (Maybe ([User], [Message])) <- fmap switchDyn $ prerender (pure never) $ do
                 pb <- getPostBuild
@@ -66,7 +65,9 @@ frontend = Frontend
                 getAndDecode fetchApi
               widgetHold_ (text "Loading") $ ffor v' $ \case
                 Nothing -> text "No data"
-                Just (users', msgs) -> divClass "ui comments" $ do
+                Just (users', msgs)
+                  | msgs == [] -> divClass "ui segment" $ text "No messages for this day; try another day"
+                  | otherwise -> divClass "ui comments" $ do
                   let users = Map.fromList $ ffor users' $ \u -> (_userId u, _userName u)
                   forM_ (filter (isJust . _messageChannelName) msgs) $ singleMessage users
             -- dyn_ $ ffor r $ \day -> do
