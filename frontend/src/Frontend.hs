@@ -26,6 +26,8 @@ import Common.Route
 import Common.Slack.Types
 import Obelisk.Generated.Static
 
+import Frontend.Util
+
 frontend :: Frontend (R Route)
 frontend = Frontend
   { _frontend_head = do
@@ -44,32 +46,63 @@ frontend = Frontend
       divClass "ui container" $ do
         divClass "ui top attached inverted header" $ do
           text "Taut"
-        divClass "ui attached segment" $ subRoute_ $ \case
-          Route_Home -> el "p" $ do
-            text "This app is a work in progress. Meanwhile, "
-            routeLink (Route_Messages :/ fromGregorian 2019 3 27) $ text "start from 2019/3/27"
-            text "?"
-          Route_Search -> do
-            query :: Dynamic t Text <- askRoute
-            el "h1" $ do
-              text "Searching for: "
-              dynText query
-            divClass "ui warning message" $ do
-              divClass "header" $ text "Work in progress"
-              text "Only a subset of results is being displayed"
-            renderMessages =<< getMessages query ("/search-messages/" <>)
-          Route_Messages -> do
-            r :: Dynamic t Day <- askRoute
-            el "h1" $ do
-              text "Messages on: "
-              dynText $ toDateInputVal <$> r
-            dyn_ $ ffor r $ \day -> do
-              routeLink (Route_Messages :/ addDays (-1) day) $ elClass "button" "ui button" $ text "Prev Day"
-            dyn_ $ ffor r $ \day -> do
-              routeLink (Route_Messages :/ addDays 1 day) $ elClass "button" "ui button" $ text "Next Day"
-            renderMessages =<< getMessages r urlForBackendGetMessages
-        divClass "ui bottom attached secondary segment" $ do
-          elAttr "a" ("href" =: "https://github.com/srid/Taut") $ text "Powered by Haskell"
+        divClass "ui attached segment" $ do
+          -- TODO: clean up the tab widget
+          divClass "ui pointing menu" $ do
+            homeCls :: Dynamic t Text <- subRoute $ \case
+              Route_Home -> pure "active item"
+              _ -> pure "item"
+            msgCls :: Dynamic t Text <- subRoute $ \case
+              Route_Messages -> pure "active item"
+              _ -> pure "item"
+            searchCls :: Dynamic t Text <- subRoute $ \case
+              Route_Search -> pure "active item"
+              _ -> pure "item"
+            routeLinkClass (Route_Home :/ ()) homeCls $ text "Home"
+            elDynClass "a" msgCls $ text "Archive"
+            divClass "right menu" $
+              elDynClass "div" searchCls $ do
+                divClass "ui transparent icon input" $ do
+                  searchQuery :: Dynamic t Text <- fmap join $ subRoute $ \case
+                    Route_Search -> askRoute
+                    _ -> pure $ constDyn ""
+                  dyn_ $ ffor searchQuery $ \q -> do
+                    -- FIXME: on initial page load this is not setting `searchQuery` at all.
+                    ie <- inputElement $ def
+                      & inputElementConfig_initialValue .~ q
+                      & inputElementConfig_elementConfig . elementConfig_initialAttributes .~ ("placeholder" =: "Search...")
+                    let search :: Event t Text = tag (current $ value ie) (keypress Enter ie)
+                    setRoute $ (Route_Search :/) <$> search
+                    dyn_ $ ffor (value ie) $ \q' ->
+                      routeLink' (Route_Search :/ q') "i" ("class" =: "search link icon") blank
+                 
+          divClass "ui segment" $ subRoute_ $ \case
+            Route_Home -> el "p" $ do
+              text "This app is a work in progress. Meanwhile, "
+              routeLink (Route_Messages :/ fromGregorian 2019 3 27) $ text "start from 2019/3/27"
+              text "?"
+            Route_Search -> do
+              query :: Dynamic t Text <- askRoute
+              elClass "h1" "ui header" $ do
+                text "Search results for "
+                dynText query
+              divClass "ui warning message" $ do
+                divClass "header" $ text "Work in progress"
+                text "Only a subset of results is being displayed"
+              renderMessages =<< getMessages query ("/search-messages/" <>)
+            Route_Messages -> do
+              r :: Dynamic t Day <- askRoute
+              elClass "h1" "ui header" $ do
+                text "Archive for "
+                dynText $ showDay <$> r
+              divClass "" $ do
+                dyn_ $ ffor r $ \day -> do
+                  routeLink (Route_Messages :/ addDays (-1) day) $ elClass "button" "ui button" $ text "Prev Day"
+                dyn_ $ ffor r $ \day -> do
+                  routeLink (Route_Messages :/ addDays 1 day) $ elClass "button" "ui button" $ text "Next Day"
+              renderMessages =<< getMessages r urlForBackendGetMessages
+          divClass "ui bottom attached secondary segment" $ do
+            elAttr "a" ("href" =: "https://github.com/srid/Taut") $ text "Powered by Haskell"
   }
   where
     getMessages
@@ -87,7 +120,7 @@ frontend = Frontend
           | otherwise -> divClass "ui comments" $ do
           let users = Map.fromList $ ffor users' $ \u -> (_userId u, _userName u)
           forM_ (filter (isJust . _messageChannelName) msgs) $ singleMessage users
-    toDateInputVal day = T.pack $ printf "%d-%02d-%02d" y m d
+    showDay day = T.pack $ printf "%d-%02d-%02d" y m d
       where
         (y, m, d) = toGregorian day
 

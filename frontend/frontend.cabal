@@ -21,6 +21,7 @@ library
                , mtl
   exposed-modules:
     Frontend
+    Frontend.Util
   ghc-options: -Wall
 
 executable frontend
