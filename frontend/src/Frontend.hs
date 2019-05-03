@@ -1,10 +1,11 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 module Frontend where
 
@@ -59,20 +60,12 @@ frontend = Frontend
             , ( This Route_Search
               , \isActive -> divClass "right menu" $
                   elDynClass "div" (itemClass isActive) $ do
-                    divClass "ui transparent icon inverted input" $ do
-                      queryWithOffset ::  Dynamic t (Text, Maybe Word) <- fmap join $ subRoute $ \case
-                        Route_Search -> askRoute
-                        _ -> pure $ constDyn ("", Nothing)
-                      dyn_ $ ffor queryWithOffset $ \(q, _offset) -> do
-                        -- FIXME: on initial page load this is not setting `searchQuery` at all.
-                        ie <- inputElement $ def
-                          & inputElementConfig_initialValue .~ q
-                          & inputElementConfig_elementConfig . elementConfig_initialAttributes .~ ("placeholder" =: "Search...")
-                        let search :: Event t Text = tag (current $ value ie) (keypress Enter ie)
-                            mkUrl q' = Route_Search :/ (q', Nothing)
-                        setRoute $ mkUrl <$> search
-                        dyn_ $ ffor (value ie) $ \q' ->
-                          routeLink' (mkUrl q') "i" ("class" =: "search link icon") blank
+                    queryWithOffset ::  Dynamic t (Text, Maybe Word) <- fmap join $ subRoute $ \case
+                      Route_Search -> askRoute
+                      _ -> pure $ constDyn ("", Nothing)
+                    dyn_ $ ffor queryWithOffset $ \(q, _offset) -> do
+                      -- FIXME: on initial page load this is not setting `searchQuery` at all.
+                      searchInputWidgetWithRoute q $ \q' -> Route_Search :/ (q', Nothing)
               )
             ]
 
