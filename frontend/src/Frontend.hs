@@ -8,10 +8,12 @@
 module Frontend where
 
 import Control.Monad
+import Data.Bool (bool)
 import Data.Foldable (foldl')
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe, isJust)
 import Data.Semigroup ((<>))
+import Data.Some
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time.Calendar
@@ -44,42 +46,38 @@ frontend = Frontend
       elAttr "link" ("rel" =: "stylesheet" <> "type" =: "text/css" <> "href" =: static @"semantic.min.css") blank
   , _frontend_body = do
       divClass "ui container" $ do
-        divClass "ui top attached inverted header" $ do
-          text "Taut"
         divClass "ui attached segment" $ do
-          -- TODO: clean up the tab widget
-          divClass "ui pointing menu" $ do
-            homeCls :: Dynamic t Text <- subRoute $ \case
-              Route_Home -> pure "active item"
-              _ -> pure "item"
-            msgCls :: Dynamic t Text <- subRoute $ \case
-              Route_Messages -> pure "active item"
-              _ -> pure "item"
-            searchCls :: Dynamic t Text <- subRoute $ \case
-              Route_Search -> pure "active item"
-              _ -> pure "item"
-            routeLinkClass (Route_Home :/ ()) homeCls $ text "Home"
-            elDynClass "a" msgCls $ text "Archive"
-            divClass "right menu" $
-              elDynClass "div" searchCls $ do
-                divClass "ui transparent icon input" $ do
-                  searchQuery :: Dynamic t Text <- fmap join $ subRoute $ \case
-                    Route_Search -> askRoute
-                    _ -> pure $ constDyn ""
-                  dyn_ $ ffor searchQuery $ \q -> do
-                    -- FIXME: on initial page load this is not setting `searchQuery` at all.
-                    ie <- inputElement $ def
-                      & inputElementConfig_initialValue .~ q
-                      & inputElementConfig_elementConfig . elementConfig_initialAttributes .~ ("placeholder" =: "Search...")
-                    let search :: Event t Text = tag (current $ value ie) (keypress Enter ie)
-                    setRoute $ (Route_Search :/) <$> search
-                    dyn_ $ ffor (value ie) $ \q' ->
-                      routeLink' (Route_Search :/ q') "i" ("class" =: "search link icon") blank
-                 
+          let itemClass active = bool "item" "active item" <$> active
+          divClass "ui pointing inverted menu" $ subRouteMenu
+            [ ( This Route_Home
+              , \isActive -> routeLinkClass (Route_Home :/ ()) (itemClass isActive) $ text "Home"
+              )
+            , ( This Route_Messages
+              , \isActive -> routeLinkClass sampleMsgR (itemClass isActive) $ text "Archive"
+              )
+            , ( This Route_Search
+              , \isActive -> divClass "right menu" $
+                  elDynClass "div" (itemClass isActive) $ do
+                    divClass "ui transparent icon inverted input" $ do
+                      searchQuery :: Dynamic t Text <- fmap join $ subRoute $ \case
+                        Route_Search -> askRoute
+                        _ -> pure $ constDyn ""
+                      dyn_ $ ffor searchQuery $ \q -> do
+                        -- FIXME: on initial page load this is not setting `searchQuery` at all.
+                        ie <- inputElement $ def
+                          & inputElementConfig_initialValue .~ q
+                          & inputElementConfig_elementConfig . elementConfig_initialAttributes .~ ("placeholder" =: "Search...")
+                        let search :: Event t Text = tag (current $ value ie) (keypress Enter ie)
+                        setRoute $ (Route_Search :/) <$> search
+                        dyn_ $ ffor (value ie) $ \q' ->
+                          routeLink' (Route_Search :/ q') "i" ("class" =: "search link icon") blank
+              )
+            ]
+
           divClass "ui segment" $ subRoute_ $ \case
             Route_Home -> el "p" $ do
-              text "This app is a work in progress. Meanwhile, "
-              routeLink (Route_Messages :/ fromGregorian 2019 3 27) $ text "start from 2019/3/27"
+              text "Welcome to Taut, the Slack archive viewer. This app is a work in progress. Meanwhile, "
+              routeLink sampleMsgR $ text "start from 2019/3/27"
               text "?"
             Route_Search -> do
               query :: Dynamic t Text <- askRoute
@@ -95,16 +93,18 @@ frontend = Frontend
               elClass "h1" "ui header" $ do
                 text "Archive for "
                 dynText $ showDay <$> r
-              divClass "" $ do
-                dyn_ $ ffor r $ \day -> do
-                  routeLink (Route_Messages :/ addDays (-1) day) $ elClass "button" "ui button" $ text "Prev Day"
-                dyn_ $ ffor r $ \day -> do
-                  routeLink (Route_Messages :/ addDays 1 day) $ elClass "button" "ui button" $ text "Next Day"
+              dyn_ $ ffor r $ \day -> do
+                routeLink (Route_Messages :/ addDays (-1) day) $ elClass "button" "ui button" $ text "Prev Day"
+              dyn_ $ ffor r $ \day -> do
+                routeLink (Route_Messages :/ addDays 1 day) $ elClass "button" "ui button" $ text "Next Day"
               renderMessages =<< getMessages r urlForBackendGetMessages
           divClass "ui bottom attached secondary segment" $ do
             elAttr "a" ("href" =: "https://github.com/srid/Taut") $ text "Powered by Haskell"
   }
   where
+    -- TODO: This should point to the very first day in the archives.
+    sampleMsgR = (Route_Messages :/ fromGregorian 2019 3 27)
+
     getMessages
       :: (Reflex t, MonadHold t m, PostBuild t m, DomBuilder t m, Prerender js t m)
       => Dynamic t r -> (r -> Text) -> m (Event t (Maybe ([User], [Message])))

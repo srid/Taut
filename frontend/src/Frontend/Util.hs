@@ -25,13 +25,26 @@
 module Frontend.Util where
 
 import Control.Lens hiding (Bifunctor, bimap, element, universe)
-import Data.Proxy
-import Prelude hiding (id, (.))
-import Data.Text (Text)
+import Control.Monad
+import Data.GADT.Compare (GEq)
 import Data.Map (Map)
+import Data.Proxy
+import Data.Some
+import Data.Text (Text)
+import Prelude hiding (id, (.))
 
 import Obelisk.Route.Frontend
 import Reflex.Dom
+
+subRouteMenu
+  :: (GEq r, DomBuilder t m)
+  => [(Some r, (Dynamic t Bool -> RoutedT t (R r) m ()))]
+  -> RoutedT t (R r) m ()
+subRouteMenu rs = do
+  forM_ rs $ \(mr, w) -> do
+    r <- askRoute
+    let active = ffor r $ \(r' :/ _) -> mr == This r'
+    w active
 
 routeLinkClass
   :: forall t m a route.
