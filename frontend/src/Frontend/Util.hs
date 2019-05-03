@@ -48,12 +48,16 @@ subRouteMenu rs = do
 
 searchInputWidget
   :: forall t m.
-     DomBuilder t m
-  => Text
+     ( DomBuilder t m
+     , MonadSample t m
+     )
+  => Dynamic t Text
   -> m (Dynamic t Text, Event t ())
-searchInputWidget q = do
+searchInputWidget dq = do
+  q <- sample $ current dq
   ie <- inputElement $ (def :: InputElementConfig EventResult t (DomBuilderSpace m))
     & inputElementConfig_initialValue .~ q
+    & inputElementConfig_setValue .~ updated dq
     & inputElementConfig_elementConfig . elementConfig_initialAttributes .~ ("placeholder" =: "Search...")
   let submitEvt = keypress Enter ie
   pure (value ie, submitEvt)
@@ -61,13 +65,15 @@ searchInputWidget q = do
 searchInputWidgetWithRoute
   :: ( DomBuilder t m
      , SetRoute t (R route) m
-     , PostBuild t m, RouteToUrl (R route) m
+     , PostBuild t m
+     , MonadSample t m
+     , RouteToUrl (R route) m
      )
-  => Text
+  => Dynamic t Text
   -> (Text -> R route)
   -> m ()
-searchInputWidgetWithRoute q mkRoute = divClass "ui transparent icon inverted input" $ do
-  (val, submit) <- searchInputWidget q
+searchInputWidgetWithRoute dq mkRoute = divClass "ui transparent icon inverted input" $ do
+  (val, submit) <- searchInputWidget dq
   setRoute $ mkRoute <$> tag (current val) submit
   dyn_ $ ffor val $ \q' ->
     routeLink' (mkRoute q') "i" ("class" =: "search link icon") blank

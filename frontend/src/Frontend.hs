@@ -60,12 +60,11 @@ frontend = Frontend
             , ( This Route_Search
               , \isActive -> divClass "right menu" $
                   elDynClass "div" (itemClass isActive) $ do
-                    queryWithOffset ::  Dynamic t (Text, Maybe Word) <- fmap join $ subRoute $ \case
-                      Route_Search -> askRoute
-                      _ -> pure $ constDyn ("", Nothing)
-                    dyn_ $ ffor queryWithOffset $ \(q, _offset) -> do
-                      -- FIXME: on initial page load this is not setting `searchQuery` at all.
-                      searchInputWidgetWithRoute q $ \q' -> Route_Search :/ (q', Nothing)
+                    -- FIXME: On hard page refresh the query is not being set as initial value in input.
+                    query <- fmap join $ subRoute $ \case
+                      Route_Search -> fmap (fmap fst) askRoute
+                      _ -> pure $ constDyn ""
+                    searchInputWidgetWithRoute query $ \q' -> Route_Search :/ (q', Nothing)
               )
             ]
 
