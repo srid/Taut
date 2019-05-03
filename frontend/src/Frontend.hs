@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -59,18 +60,19 @@ frontend = Frontend
               , \isActive -> divClass "right menu" $
                   elDynClass "div" (itemClass isActive) $ do
                     divClass "ui transparent icon inverted input" $ do
-                      searchQuery :: Dynamic t Text <- fmap join $ subRoute $ \case
+                      queryWithOffset ::  Dynamic t (Text, Maybe Word) <- fmap join $ subRoute $ \case
                         Route_Search -> askRoute
-                        _ -> pure $ constDyn ""
-                      dyn_ $ ffor searchQuery $ \q -> do
+                        _ -> pure $ constDyn ("", Nothing)
+                      dyn_ $ ffor queryWithOffset $ \(q, _offset) -> do
                         -- FIXME: on initial page load this is not setting `searchQuery` at all.
                         ie <- inputElement $ def
                           & inputElementConfig_initialValue .~ q
                           & inputElementConfig_elementConfig . elementConfig_initialAttributes .~ ("placeholder" =: "Search...")
                         let search :: Event t Text = tag (current $ value ie) (keypress Enter ie)
-                        setRoute $ (Route_Search :/) <$> search
+                            mkUrl q' = Route_Search :/ (q', Nothing)
+                        setRoute $ mkUrl <$> search
                         dyn_ $ ffor (value ie) $ \q' ->
-                          routeLink' (Route_Search :/ q') "i" ("class" =: "search link icon") blank
+                          routeLink' (mkUrl q') "i" ("class" =: "search link icon") blank
               )
             ]
 
@@ -80,14 +82,16 @@ frontend = Frontend
               routeLink sampleMsgR $ text "start from 2019/3/27"
               text "?"
             Route_Search -> do
-              query :: Dynamic t Text <- askRoute
+              queryWithOffset :: Dynamic t (Text, Maybe Word) <- askRoute
               elClass "h1" "ui header" $ do
                 text "Search results for "
-                dynText query
+                dynText $ T.pack . show <$> queryWithOffset
               divClass "ui warning message" $ do
                 divClass "header" $ text "Work in progress"
                 text "Only a subset of results is being displayed"
-              renderMessages =<< getMessages query ("/search-messages/" <>)
+              renderMessages =<< getMessages queryWithOffset
+                -- FIXME: refactor
+                (\(q, o) -> "/search-messages/" <> q <> "?offset" <> (maybe "" ("=" <>) $ T.pack . show <$> o))
             Route_Messages -> do
               r :: Dynamic t Day <- askRoute
               elClass "h1" "ui header" $ do

@@ -1,6 +1,6 @@
 # Taut
 
-This is destined to address a pain point of Slack. Work in progress.
+An ambitious Slack JSON archive viewer. Work in progress.
 
 ## Running
 

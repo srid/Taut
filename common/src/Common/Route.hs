@@ -9,13 +9,14 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Common.Route where
 
-import Prelude hiding ((.))
+import Prelude
 
 import Control.Monad.Except
 import Data.Functor.Sum
 import Data.Functor.Identity
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Map as Map
 import Data.Time.Calendar
 import Text.Read (readMaybe)
 
@@ -28,12 +29,12 @@ data BackendRoute :: * -> * where
   BackendRoute_Missing :: BackendRoute ()
   --TODO: How do we do routes with strongly-typed results?
   BackendRoute_GetMessages :: BackendRoute Day
-  BackendRoute_SearchMessages :: BackendRoute Text
+  BackendRoute_SearchMessages :: BackendRoute (Text, Maybe Word)
 
 data Route :: * -> * where
   Route_Home :: Route ()
   Route_Messages :: Route Day
-  Route_Search :: Route Text
+  Route_Search :: Route (Text, Maybe Word)
 
 backendRouteEncoder
   :: Encoder (Either Text) Identity (R (Sum BackendRoute (ObeliskRoute Route))) PageName
@@ -42,13 +43,21 @@ backendRouteEncoder = handleEncoder (const (InL BackendRoute_Missing :/ ())) $
     InL backendRoute -> case backendRoute of
       BackendRoute_Missing -> PathSegment "missing" $ unitEncoder mempty
       BackendRoute_GetMessages -> PathSegment "get-messages" $ dayEncoder
-      BackendRoute_SearchMessages -> PathSegment "search-messages" $ singlePathSegmentEncoder
+      BackendRoute_SearchMessages -> PathSegment "search-messages" $ searchEncoder
     InR obeliskRoute -> obeliskRouteSegment obeliskRoute $ \case
       -- The encoder given to PathEnd determines how to parse query parameters,
       -- in this example, we have none, so we insist on it.
       Route_Home -> PathEnd $ unitEncoder mempty
       Route_Messages -> PathSegment "messages" $ dayEncoder
-      Route_Search -> PathSegment "search" $ singlePathSegmentEncoder
+      Route_Search -> PathSegment "search" $ searchEncoder
+
+searchEncoder  :: (Applicative check, MonadError Text parse) => Encoder check parse (Text, Maybe Word) PageName
+searchEncoder = unsafeMkEncoder $ EncoderImpl
+  { _encoderImpl_decode = \(path, query) -> case path of
+      [q] -> pure (q, read . T.unpack <$> join (Map.lookup "offset" query))
+      _ -> throwError "searchEncoder: invalid path"
+  , _encoderImpl_encode = \(q, offset) -> ([q], (Map.singleton "offset" (T.pack . show <$> offset)))
+  }
 
 -- TODO: clean this up
 dayEncoder :: (Applicative check, MonadError Text parse) => Encoder check parse Day PageName

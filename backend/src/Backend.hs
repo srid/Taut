@@ -18,6 +18,7 @@ import Data.Functor.Identity
 import Data.List (isSuffixOf)
 import Data.List.Split (chunksOf)
 import Data.Monoid ((<>))
+import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import Data.Time.Calendar
 import Data.Time.Clock
@@ -59,13 +60,15 @@ backend = Backend
               select $ all_ (_slackUsers slackDb)
             pure (users, msgs)
           writeLBS $ encode resp
-        BackendRoute_SearchMessages :=> Identity query -> do
+        BackendRoute_SearchMessages :=> Identity (query, moffset) -> do
           let sqlQuery = "%" <> query <> "%"
+              offset = toInteger $ fromMaybe 0 moffset
+              limit = 10  -- TODO: Increase after fully testing pagination
           resp <- liftIO $ SQLite.withConnection dbFile $ \conn -> do
             msgs :: [Message] <- runBeamSqlite conn $
               runSelectReturningList $
               select $ do
-                limit_ 100 $ orderBy_ (asc_ . _messageTs) $
+                limit_ limit $ offset_ offset $ orderBy_ (asc_ . _messageTs) $
                   filter_ (\msg -> (_messageText msg `like_` val_ sqlQuery)) $
                     all_ (_slackMessages slackDb)
             -- TODO: separate endpoint for this?
