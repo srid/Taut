@@ -17,8 +17,9 @@ import Data.Dependent.Sum (DSum (..))
 import Data.Functor.Identity
 import Data.List (isSuffixOf)
 import Data.List.Split (chunksOf)
-import Data.Monoid ((<>))
 import Data.Maybe (fromMaybe)
+import Data.Monoid ((<>))
+import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time.Calendar
 import Data.Time.Clock
@@ -27,8 +28,8 @@ import System.FilePath ((</>))
 
 import Control.Lens.Operators ((<&>))
 import Database.Beam
-import Database.Beam.Sqlite (runBeamSqlite)
-import Database.Beam.Sqlite.Syntax (SqliteExpressionSyntax)
+import Database.Beam.Backend.SQL
+import Database.Beam.Sqlite
 import qualified Database.SQLite.Simple as SQLite
 
 import Snap
@@ -37,6 +38,27 @@ import Obelisk.Backend as Ob
 
 import Common.Route
 import Common.Slack.Types
+
+data Query
+  = Query_Day Day
+  | Query_Like Text
+
+filterQuery
+  :: forall be s.
+     ( BeamSqlBackend be
+     , BeamSqlBackendIsString be Text
+     , HasSqlValueSyntax (BeamSqlBackendValueSyntax be) Text
+     , HasSqlValueSyntax (BeamSqlBackendValueSyntax be) UTCTime
+     )
+  => Query
+  -> Q be SlackDb s (MessageT (QExpr be s))
+  -> Q be SlackDb s (MessageT (QExpr be s))
+filterQuery = \case
+  Query_Day day ->
+    let fromDate = UTCTime day 0
+        toDate = UTCTime (addDays 1 day) 0
+    in filter_ (\msg -> (_messageTs msg >=. val_ fromDate) &&. (_messageTs msg <. val_ toDate))
+  Query_Like q -> filter_ (\msg -> (_messageText msg `like_` val_ ("%" <> q <> "%")))
 
 backend :: Backend BackendRoute Route
 backend = Backend
@@ -47,43 +69,37 @@ backend = Backend
         BackendRoute_Missing :=> Identity () -> do
           writeLBS "404"
         BackendRoute_GetMessages :=> Identity day -> do
-          let fromDate = UTCTime day 0
-              toDate = UTCTime (addDays 1 day) 0
-          resp <- liftIO $ SQLite.withConnection dbFile $ \conn -> do
-            msgs :: [Message] <- runBeamSqlite conn $
-              runSelectReturningList $
-              select $ do
-                filter_ (\msg -> (_messageTs msg >=. val_ fromDate) &&. (_messageTs msg <. val_ toDate)) $
-                  all_ (_slackMessages slackDb)
-            users :: [User] <- runBeamSqlite conn $
-              runSelectReturningList $
-              select $ all_ (_slackUsers slackDb)
-            pure (users, msgs)
+          resp <- queryMessages (Query_Day day) (Nothing :: Maybe Int)
           writeLBS $ encode resp
         BackendRoute_SearchMessages :=> Identity (query, moffset) -> do
-          let sqlQuery = "%" <> query <> "%"
-              offset = toInteger $ fromMaybe 0 moffset
-              limit = 10  -- TODO: Increase after fully testing pagination
-          resp <- liftIO $ SQLite.withConnection dbFile $ \conn -> do
-            msgs :: [Message] <- runBeamSqlite conn $
-              runSelectReturningList $
-              select $ do
-                limit_ limit $ offset_ offset $ orderBy_ (asc_ . _messageTs) $
-                  filter_ (\msg -> (_messageText msg `like_` val_ sqlQuery)) $
-                    all_ (_slackMessages slackDb)
-            -- TODO: separate endpoint for this?
-            users :: [User] <- runBeamSqlite conn $
-              runSelectReturningList $
-              select $ all_ (_slackUsers slackDb)
-            pure (users, msgs)
+          resp <- queryMessages (Query_Like query) moffset
           writeLBS $ encode resp
   }
+  where
+    queryMessages q moffset = do
+      liftIO $ SQLite.withConnection dbFile $ \conn -> do
+        total :: Int <- fmap (fromMaybe 0) $ runBeamSqlite conn $
+          runSelectReturningOne $
+          select $ do
+            aggregate_ (\_ -> countAll_) $ filterQuery q $ all_ (_slackMessages slackDb)
+        msgs :: [Message] <- runBeamSqlite conn $ do
+          let offset = toInteger $ fromMaybe 0 moffset
+              limit = 10  -- TODO: Increase after fully testing pagination
+          runSelectReturningList $ select $ do
+            limit_ limit $ offset_ offset $ orderBy_ (asc_ . _messageTs) $
+              filterQuery q $
+                all_ (_slackMessages slackDb)
+        -- TODO: separate endpoint for this?
+        users :: [User] <- runBeamSqlite conn $
+          runSelectReturningList $
+          select $ all_ (_slackUsers slackDb)
+        pure (users, msgs, total)
 
 rootDir :: String
 rootDir = "/home/srid/code/Taut/tmp"
 
 dbFile :: String
-dbFile = rootDir <> "/data.sqlite3"
+dbFile = rootDir <> "/data2.sqlite3"
 
 data SlackDb f = SlackDb
   { _slackChannels :: f (TableEntity ChannelT)
@@ -146,7 +162,7 @@ populateDatabase = do
             insert (_slackMessages slackDb) $
             insertExpressions (mkMessageExpr <$> chunk)
   where
-    mkMessageExpr :: Message -> MessageT (QExpr SqliteExpressionSyntax s)
+    mkMessageExpr :: Message -> MessageT (QExpr Sqlite s)
     mkMessageExpr m = Message
       (val_ $ _messageType m)
       (val_ $ _messageSubtype m)

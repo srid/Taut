@@ -62,7 +62,7 @@ frontend = Frontend
                   elDynClass "div" (itemClass isActive) $ do
                     -- FIXME: On hard page refresh the query is not being set as initial value in input.
                     query <- fmap join $ subRoute $ \case
-                      Route_Search -> fmap (fmap fst) askRoute
+                      Route_Search -> fmap fst <$> askRoute
                       _ -> pure $ constDyn ""
                     searchInputWidgetWithRoute query $ \q' -> Route_Search :/ (q', Nothing)
               )
@@ -81,8 +81,9 @@ frontend = Frontend
               divClass "ui warning message" $ do
                 divClass "header" $ text "Work in progress"
                 text "Only a subset of results is being displayed"
+
               renderMessages =<< getMessages queryWithOffset
-                -- FIXME: refactor
+                -- FIXME: refactor after https://github.com/obsidiansystems/obelisk/pull/286#issuecomment-489265962
                 (\(q, o) -> "/search-messages/" <> q <> "?offset" <> (maybe "" ("=" <>) $ T.pack . show <$> o))
             Route_Messages -> do
               r :: Dynamic t Day <- askRoute
@@ -103,7 +104,7 @@ frontend = Frontend
 
     getMessages
       :: (Reflex t, MonadHold t m, PostBuild t m, DomBuilder t m, Prerender js t m)
-      => Dynamic t r -> (r -> Text) -> m (Event t (Maybe ([User], [Message])))
+      => Dynamic t r -> (r -> Text) -> m (Event t (Maybe ([User], [Message], Int)))
     getMessages r mkUrl = switchHold never <=< dyn $ ffor r $ \x -> do
       fmap switchDyn $ prerender (pure never) $ do
         pb <- getPostBuild
@@ -111,11 +112,13 @@ frontend = Frontend
     renderMessages msgsE =
       widgetHold_ (divClass "ui loading segment" blank) $ ffor msgsE $ divClass "ui segment" . \case
         Nothing -> text "Something went wrong"
-        Just (users', msgs)
+        Just (users', msgs, cnt)
           | msgs == [] -> text "No messages for this day; try another day"
           | otherwise -> divClass "ui comments" $ do
-          let users = Map.fromList $ ffor users' $ \u -> (_userId u, _userName u)
-          forM_ (filter (isJust . _messageChannelName) msgs) $ singleMessage users
+              divClass "ui message" $
+                text $ "Displaying " <> T.pack (show $ length msgs) <> " out of " <> T.pack (show cnt)
+              let users = Map.fromList $ ffor users' $ \u -> (_userId u, _userName u)
+              forM_ (filter (isJust . _messageChannelName) msgs) $ singleMessage users
     showDay day = T.pack $ printf "%d-%02d-%02d" y m d
       where
         (y, m, d) = toGregorian day
