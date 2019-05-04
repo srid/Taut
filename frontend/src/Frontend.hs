@@ -82,9 +82,8 @@ frontend = Frontend
                 -- FIXME: refactor after https://github.com/obsidiansystems/obelisk/pull/286#issuecomment-489265962
                 (\(q, p) -> "/search-messages/" <> q <> "?page" <> (maybe "" ("=" <>) $ T.pack . show <$> p))
               let pgn = attachWithMaybe (\(q, mpage) mm -> (\(_, _, cnt) -> (q, fromMaybe 1 mpage, cnt)) <$> mm) (current r) msgsE
-              widgetHold_ blank $ ffor pgn $ \(q, p, c) -> paginationNav p c $ \p' ->
-                Route_Search :/ (q, Just p')
-              renderMessages msgsE
+              let pgnW = widgetHold_ blank $ ffor pgn $ \(q, p, c) -> paginationNav p c $ \p' -> Route_Search :/ (q, Just p')
+              pgnW >> renderMessages msgsE >> pgnW
             Route_Messages -> do
               r :: Dynamic t Day <- askRoute
               elClass "h1" "ui header" $ do
@@ -116,7 +115,6 @@ frontend = Frontend
         Just (users', msgs, _cnt)
           | msgs == [] -> text "No results"
           | otherwise -> divClass "ui comments" $ do
-
               let users = Map.fromList $ ffor users' $ \u -> (_userId u, _userName u)
               forM_ (filter (isJust . _messageChannelName) msgs) $ singleMessage users
     showDay day = T.pack $ printf "%d-%02d-%02d" y m d

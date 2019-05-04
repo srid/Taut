@@ -133,5 +133,6 @@ routeLink' r elementTag attr w = do
         & elementConfig_eventSpec %~ addEventSpecFlags (Proxy :: Proxy (DomBuilderSpace m)) Click (\_ -> preventDefault)
         & elementConfig_initialAttributes .~ (attr <> "href" =: enc r)
   (e, a) <- element elementTag cfg w
+  -- TODO: This should "scrollTo" top automatically if the user is at the bottom of the page
   setRoute $ r <$ domEvent Click e
   return a

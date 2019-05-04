@@ -8,6 +8,7 @@ library
   build-depends: aeson
                , base
                , bytestring
+               , containers
                , dependent-sum
                , dependent-sum-template
                , obelisk-route

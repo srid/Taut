@@ -7,6 +7,7 @@ library
   hs-source-dirs: src
   build-depends: base
                , common
+               , dependent-sum
                , reflex-dom
                , text
                , string-conv
@@ -16,6 +17,7 @@ library
                , clay
                , containers
                , time
+               , lens
                , modern-uri
                , jsaddle
                , mtl
@@ -29,6 +31,7 @@ executable frontend
   hs-source-dirs: src
   build-depends: base
                , common
+               , dependent-sum
                , reflex-dom
                , text
                , frontend
@@ -39,6 +42,7 @@ executable frontend
                , clay
                , containers
                , time
+               , lens
                , modern-uri
                , jsaddle
                , mtl
