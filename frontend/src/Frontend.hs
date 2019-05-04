@@ -77,7 +77,7 @@ frontend = Frontend
               r  :: Dynamic t (Text, Maybe Word) <- askRoute
               elClass "h1" "ui header" $ do
                 text "Messages matching: "
-                dynText $ fst <$> r
+                dynText $ T.pack . show . fst <$> r
               msgsE <- getMessages r
                 -- FIXME: refactor after https://github.com/obsidiansystems/obelisk/pull/286#issuecomment-489265962
                 (\(q, p) -> "/search-messages/" <> q <> "?page" <> (maybe "" ("=" <>) $ T.pack . show <$> p))
@@ -105,7 +105,7 @@ frontend = Frontend
 
     getMessages
       :: (Reflex t, MonadHold t m, PostBuild t m, DomBuilder t m, Prerender js t m)
-      => Dynamic t r -> (r -> Text) -> m (Event t (Maybe ([User], [Message], Int)))
+      => Dynamic t r -> (r -> Text) -> m (Event t (Maybe ([User], [Message], Word)))
     getMessages r mkUrl = switchHold never <=< dyn $ ffor r $ \x -> do
       fmap switchDyn $ prerender (pure never) $ do
         pb <- getPostBuild

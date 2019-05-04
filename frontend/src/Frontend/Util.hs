@@ -86,22 +86,21 @@ paginationNav
      , SetRoute t (R route) m
      )
   => Word
-  -> Int
+  -> Word
   -> (Word -> R route)
   -> m ()
 paginationNav page cnt mkRoute = do
   divClass "ui message" $ do
-    if page > 1
-      then routeLink (mkRoute $ page - 1) $
+    when (page > 1) $
+      routeLink (mkRoute $ page - 1) $
         elClass "button" "ui button" $ text "Prev"
-      else blank
     text "Page "
     text $ T.pack $ show page
     text " of "
-    text $ T.pack $ show cnt  -- TODO: show number of pages not matches
-    text " matches"
-    routeLink (mkRoute $ 1 + page) $
-      elClass "button" "ui button" $ text "Next"
+    text $ T.pack $ show cnt
+    when (page < cnt) $
+      routeLink (mkRoute $ 1 + page) $
+        elClass "button" "ui button" $ text "Next"
 
 routeLinkClass
   :: forall t m a route.

@@ -74,6 +74,11 @@ defaultPagination = Pagination defaultLimit
 paginationOffset :: Pagination -> Word
 paginationOffset (Pagination c i) = i * c
 
+paginationPageCount :: Pagination -> Word -> Word
+paginationPageCount (Pagination l _) total = case total `divMod` l of
+  (x, 0) -> x
+  (x, _) -> x + 1
+
 backend :: Backend BackendRoute Route
 backend = Backend
   { _backend_routeEncoder = backendRouteEncoder
@@ -109,7 +114,8 @@ backend = Backend
         users :: [User] <- runBeamSqlite conn $
           runSelectReturningList $ select $
             all_ (_slackUsers slackDb)
-        pure (users, msgs, total)
+        let pages :: Word = fromMaybe 1 $ flip paginationPageCount (fromIntegral total) <$> mpagination
+        pure (users, msgs, pages)
     paginate p = limit_ (toInteger $ _pagination_pageLength p) . offset_ (toInteger $ paginationOffset p)
 
 rootDir :: String
