@@ -74,32 +74,16 @@ frontend = Frontend
               routeLink sampleMsgR $ text "start from 2019/3/27"
               text "?"
             Route_Search -> do
-              queryWithPage  :: Dynamic t (Text, Maybe Word) <- askRoute
+              r  :: Dynamic t (Text, Maybe Word) <- askRoute
               elClass "h1" "ui header" $ do
-                text "Search results for "
-                dynText $ T.pack . show <$> queryWithPage
-              let mpage :: Dynamic t (Maybe Word) = maybe (Just 1) Just . snd <$> queryWithPage
-              msgsE <- getMessages queryWithPage
+                text "Messages matching: "
+                dynText $ fst <$> r
+              msgsE <- getMessages r
                 -- FIXME: refactor after https://github.com/obsidiansystems/obelisk/pull/286#issuecomment-489265962
                 (\(q, p) -> "/search-messages/" <> q <> "?page" <> (maybe "" ("=" <>) $ T.pack . show <$> p))
-              widgetHold_ blank $ ffor msgsE $ \case
-                Nothing -> blank
-                Just (_, _, cnt) -> dyn_ $ ffor mpage $ maybe blank $ \page ->
-                  divClass "ui message" $ do
-                    dyn_ $ ffor queryWithPage $ \(q, p') -> do
-                      let p = fromMaybe 1 p'
-                      if p > 1
-                        then routeLink (Route_Search :/ (q, Just $ p - 1)) $
-                          elClass "button" "ui button" $ text "Prev"
-                        else blank
-                    text "Page "
-                    text $ T.pack $ show page
-                    text " of "
-                    text $ T.pack $ show cnt
-                    text " matches"
-                    dyn_ $ ffor queryWithPage $ \(q, p) ->
-                      routeLink (Route_Search :/ (q, Just $ 1 + fromMaybe 1 p)) $
-                        elClass "button" "ui button" $ text "Next"
+              let pgn = attachWithMaybe (\(q, mpage) mm -> (\(_, _, cnt) -> (q, fromMaybe 1 mpage, cnt)) <$> mm) (current r) msgsE
+              widgetHold_ blank $ ffor pgn $ \(q, p, c) -> paginationNav p c $ \p' ->
+                Route_Search :/ (q, Just p')
               renderMessages msgsE
             Route_Messages -> do
               r :: Dynamic t Day <- askRoute
