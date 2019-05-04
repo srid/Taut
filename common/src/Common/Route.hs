@@ -71,20 +71,6 @@ backendRouteEncoder = handleEncoder (const (InL BackendRoute_Missing :/ ())) $
       Route_Search -> PathSegment "search" $
         paginatedEncoder textEncoderImpl
 
-paginatedEncoder'
-  :: (Applicative check, MonadError Text parse)
-  => Encoder check parse (PaginatedRoute Text) PageName
-paginatedEncoder' = unsafeMkEncoder $ EncoderImpl
-  { _encoderImpl_decode = \(path, query) -> case path of
-      [q] -> pure $ PaginatedRoute
-        ( fromMaybe 1 $ read . T.unpack <$> join (Map.lookup "page" query)
-        , q
-        )
-      _ -> throwError "paginatedEncoder: invalid path"
-  , _encoderImpl_encode = \(PaginatedRoute (page, q)) ->
-      ([q], (Map.singleton "page" (Just $ T.pack $ show $ page)))
-  }
-
 paginatedEncoder
   :: (Applicative check, MonadError Text parse)
   => EncoderImpl parse a [Text]
