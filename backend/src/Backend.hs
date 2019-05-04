@@ -68,7 +68,7 @@ backend = Backend
   { _backend_routeEncoder = backendRouteEncoder
   , _backend_run = \serve -> do
       liftIO populateDatabase
-      let defaultPageSize = 10 :: Natural -- TODO: increase
+      let defaultPageSize = 30 :: Natural
           mkTautPagination :: Natural -> IO Pagination = liftIO . mkPagination defaultPageSize
           routeToPagination (PaginatedRoute (p, _)) = mkTautPagination p
       serve $ \case
