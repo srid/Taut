@@ -29,7 +29,7 @@ import System.FilePath ((</>))
 import Control.Lens.Operators ((<&>))
 import Database.Beam
 import Database.Beam.Backend.SQL
-import Database.Beam.Sqlite
+import Database.Beam.Sqlite (Sqlite, runBeamSqlite)
 import qualified Database.SQLite.Simple as SQLite
 
 import Snap
@@ -60,6 +60,20 @@ filterQuery = \case
     in filter_ (\msg -> (_messageTs msg >=. val_ fromDate) &&. (_messageTs msg <. val_ toDate))
   Query_Like q -> filter_ (\msg -> (_messageText msg `like_` val_ ("%" <> q <> "%")))
 
+data Pagination = Pagination
+  { _pagination_pageLength :: Word -- ^ Count of items per page
+  , _pagination_page :: Word -- ^ Current page; 0 = first page.
+  }
+  deriving (Eq, Show, Ord)
+
+defaultPagination :: Word -> Pagination
+defaultPagination = Pagination defaultLimit
+  where
+    defaultLimit = 10 -- TODO: change after finishing testing.
+
+paginationOffset :: Pagination -> Word
+paginationOffset (Pagination c i) = i * c
+
 backend :: Backend BackendRoute Route
 backend = Backend
   { _backend_routeEncoder = backendRouteEncoder
@@ -69,31 +83,34 @@ backend = Backend
         BackendRoute_Missing :=> Identity () -> do
           writeLBS "404"
         BackendRoute_GetMessages :=> Identity day -> do
-          resp <- queryMessages (Query_Day day) (Nothing :: Maybe Int)
+          resp <- queryMessages (Query_Day day) Nothing
           writeLBS $ encode resp
-        BackendRoute_SearchMessages :=> Identity (query, moffset) -> do
-          resp <- queryMessages (Query_Like query) moffset
+        BackendRoute_SearchMessages :=> Identity (query, mpage) -> do
+          let pagination = defaultPagination . (\x -> x - 1) $ fromMaybe 1 mpage
+          resp <- queryMessages (Query_Like query) $ Just pagination
           writeLBS $ encode resp
   }
   where
-    queryMessages q moffset = do
+    queryMessages q (mpagination :: Maybe Pagination) = do
       liftIO $ SQLite.withConnection dbFile $ \conn -> do
         total :: Int <- fmap (fromMaybe 0) $ runBeamSqlite conn $
           runSelectReturningOne $
           select $ do
             aggregate_ (\_ -> countAll_) $ filterQuery q $ all_ (_slackMessages slackDb)
         msgs :: [Message] <- runBeamSqlite conn $ do
-          let offset = toInteger $ fromMaybe 0 moffset
-              limit = 10  -- TODO: Increase after fully testing pagination
           runSelectReturningList $ select $ do
-            limit_ limit $ offset_ offset $ orderBy_ (asc_ . _messageTs) $
-              filterQuery q $
-                all_ (_slackMessages slackDb)
+            -- TODO: refactor
+            case mpagination of
+              Nothing ->
+                orderBy_ (asc_ . _messageTs) $ filterQuery q $ all_ (_slackMessages slackDb)
+              Just p -> paginate p $
+                orderBy_ (asc_ . _messageTs) $ filterQuery q $ all_ (_slackMessages slackDb)
         -- TODO: separate endpoint for this?
         users :: [User] <- runBeamSqlite conn $
-          runSelectReturningList $
-          select $ all_ (_slackUsers slackDb)
+          runSelectReturningList $ select $
+            all_ (_slackUsers slackDb)
         pure (users, msgs, total)
+    paginate p = limit_ (toInteger $ _pagination_pageLength p) . offset_ (toInteger $ paginationOffset p)
 
 rootDir :: String
 rootDir = "/home/srid/code/Taut/tmp"

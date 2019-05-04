@@ -74,17 +74,33 @@ frontend = Frontend
               routeLink sampleMsgR $ text "start from 2019/3/27"
               text "?"
             Route_Search -> do
-              queryWithOffset :: Dynamic t (Text, Maybe Word) <- askRoute
+              queryWithPage  :: Dynamic t (Text, Maybe Word) <- askRoute
               elClass "h1" "ui header" $ do
                 text "Search results for "
-                dynText $ T.pack . show <$> queryWithOffset
-              divClass "ui warning message" $ do
-                divClass "header" $ text "Work in progress"
-                text "Only a subset of results is being displayed"
-
-              renderMessages =<< getMessages queryWithOffset
+                dynText $ T.pack . show <$> queryWithPage
+              let mpage :: Dynamic t (Maybe Word) = maybe (Just 1) Just . snd <$> queryWithPage
+              msgsE <- getMessages queryWithPage
                 -- FIXME: refactor after https://github.com/obsidiansystems/obelisk/pull/286#issuecomment-489265962
-                (\(q, o) -> "/search-messages/" <> q <> "?offset" <> (maybe "" ("=" <>) $ T.pack . show <$> o))
+                (\(q, p) -> "/search-messages/" <> q <> "?page" <> (maybe "" ("=" <>) $ T.pack . show <$> p))
+              widgetHold_ blank $ ffor msgsE $ \case
+                Nothing -> blank
+                Just (_, _, cnt) -> dyn_ $ ffor mpage $ maybe blank $ \page ->
+                  divClass "ui message" $ do
+                    dyn_ $ ffor queryWithPage $ \(q, p') -> do
+                      let p = fromMaybe 1 p'
+                      if p > 1
+                        then routeLink (Route_Search :/ (q, Just $ p - 1)) $
+                          elClass "button" "ui button" $ text "Prev"
+                        else blank
+                    text "Page "
+                    text $ T.pack $ show page
+                    text " of "
+                    text $ T.pack $ show cnt
+                    text " matches"
+                    dyn_ $ ffor queryWithPage $ \(q, p) ->
+                      routeLink (Route_Search :/ (q, Just $ 1 + fromMaybe 1 p)) $
+                        elClass "button" "ui button" $ text "Next"
+              renderMessages msgsE
             Route_Messages -> do
               r :: Dynamic t Day <- askRoute
               elClass "h1" "ui header" $ do
@@ -94,7 +110,8 @@ frontend = Frontend
                 routeLink (Route_Messages :/ addDays (-1) day) $ elClass "button" "ui button" $ text "Prev Day"
               dyn_ $ ffor r $ \day -> do
                 routeLink (Route_Messages :/ addDays 1 day) $ elClass "button" "ui button" $ text "Next Day"
-              renderMessages =<< getMessages r urlForBackendGetMessages
+              msgsE <- getMessages r urlForBackendGetMessages
+              renderMessages msgsE
           divClass "ui bottom attached secondary segment" $ do
             elAttr "a" ("href" =: "https://github.com/srid/Taut") $ text "Powered by Haskell"
   }
@@ -112,11 +129,10 @@ frontend = Frontend
     renderMessages msgsE =
       widgetHold_ (divClass "ui loading segment" blank) $ ffor msgsE $ divClass "ui segment" . \case
         Nothing -> text "Something went wrong"
-        Just (users', msgs, cnt)
-          | msgs == [] -> text "No messages for this day; try another day"
+        Just (users', msgs, _cnt)
+          | msgs == [] -> text "No results"
           | otherwise -> divClass "ui comments" $ do
-              divClass "ui message" $
-                text $ "Displaying " <> T.pack (show $ length msgs) <> " out of " <> T.pack (show cnt)
+
               let users = Map.fromList $ ffor users' $ \u -> (_userId u, _userName u)
               forM_ (filter (isJust . _messageChannelName) msgs) $ singleMessage users
     showDay day = T.pack $ printf "%d-%02d-%02d" y m d

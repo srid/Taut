@@ -54,9 +54,9 @@ backendRouteEncoder = handleEncoder (const (InL BackendRoute_Missing :/ ())) $
 searchEncoder  :: (Applicative check, MonadError Text parse) => Encoder check parse (Text, Maybe Word) PageName
 searchEncoder = unsafeMkEncoder $ EncoderImpl
   { _encoderImpl_decode = \(path, query) -> case path of
-      [q] -> pure (q, read . T.unpack <$> join (Map.lookup "offset" query))
+      [q] -> pure (q, read . T.unpack <$> join (Map.lookup "page" query))
       _ -> throwError "searchEncoder: invalid path"
-  , _encoderImpl_encode = \(q, offset) -> ([q], (Map.singleton "offset" (T.pack . show <$> offset)))
+  , _encoderImpl_encode = \(q, page) -> ([q], (Map.singleton "page" (T.pack . show <$> page)))
   }
 
 -- TODO: clean this up
