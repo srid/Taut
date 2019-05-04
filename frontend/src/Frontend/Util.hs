@@ -94,15 +94,19 @@ paginationNav p mkRoute = when (hasOtherPages p) $ do
   let idx = pageIndex $ paginatedPagination p
   divClass "ui message" $ do
     when (hasPrevPage p) $
-      routeLink (mkRoute $ idx - 1) $ -- TODO: routes?
+      routeLink (mkRoute $ sub1Natural idx) $
         elClass "button" "ui button" $ text "Prev"
     text "Page "
     text $ T.pack $ show idx
     text " of "
     text $ T.pack $ show $ paginatedPagesTotal p
     when (hasNextPage p) $
-      routeLink (mkRoute $ 1 + idx) $
+      routeLink (mkRoute $ succ idx) $
         elClass "button" "ui button" $ text "Next"
+  where
+    -- Workaround arithmetic underflow bug with a mere `n - 1` or `pred n` in
+    -- GHCJS
+    sub1Natural n = fromIntegral $ (toInteger n) - 1
 
 routeLinkClass
   :: forall t m a route.
