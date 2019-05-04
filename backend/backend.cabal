@@ -26,6 +26,7 @@ library
                , dependent-sum-template
                , mmark
                , modern-uri
+               , pagination
                , yaml
                , directory
                , filepath
@@ -63,6 +64,7 @@ executable backend
                , dependent-sum-template
                , mmark
                , modern-uri
+               , pagination
                , yaml
                , directory
                , filepath

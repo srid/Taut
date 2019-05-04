@@ -13,6 +13,7 @@ library
                , dependent-sum-template
                , obelisk-route
                , mtl
+               , pagination
                , text
                , these
                , universe

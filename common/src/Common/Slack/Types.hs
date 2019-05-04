@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -13,6 +15,7 @@ import Data.Aeson
 import Data.Text (Text)
 import Data.Time.Clock
 
+import Data.Pagination (Paginated, Pagination)
 import Database.Beam
 
 import Common.Slack.Internal
@@ -145,3 +148,8 @@ instance ToJSON Profile where
   toJSON = genericToJSON fieldLabelMod
 instance ToJSON Channel where
   toJSON = genericToJSON fieldLabelMod
+
+instance ToJSON Pagination
+instance ToJSON (Paginated Message)
+instance FromJSON Pagination
+instance FromJSON (Paginated Message)

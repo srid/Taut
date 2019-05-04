@@ -30,6 +30,8 @@ import Common.Route
 import Common.Slack.Types
 import Obelisk.Generated.Static
 
+import Data.Pagination
+
 import Frontend.Util
 
 frontend :: Frontend (R Route)
@@ -62,9 +64,9 @@ frontend = Frontend
                   elDynClass "div" (itemClass isActive) $ do
                     -- FIXME: On hard page refresh the query is not being set as initial value in input.
                     query <- fmap join $ subRoute $ \case
-                      Route_Search -> fmap fst <$> askRoute
+                      Route_Search -> fmap paginatedRouteValue <$> askRoute
                       _ -> pure $ constDyn ""
-                    searchInputWidgetWithRoute query $ \q' -> Route_Search :/ (q', Nothing)
+                    searchInputWidgetWithRoute query $ \q' -> Route_Search :/ (PaginatedRoute (1, q'))
               )
             ]
 
@@ -74,37 +76,48 @@ frontend = Frontend
               routeLink sampleMsgR $ text "start from 2019/3/27"
               text "?"
             Route_Search -> do
-              r  :: Dynamic t (Text, Maybe Word) <- askRoute
+              r  :: Dynamic t (PaginatedRoute Text) <- askRoute
               elClass "h1" "ui header" $ do
                 text "Messages matching: "
-                dynText $ T.pack . show . fst <$> r
-              msgsE <- getMessages r
-                -- FIXME: refactor after https://github.com/obsidiansystems/obelisk/pull/286#issuecomment-489265962
-                (\(q, p) -> "/search-messages/" <> q <> "?page" <> (maybe "" ("=" <>) $ T.pack . show <$> p))
-              let pgn = attachWithMaybe (\(q, mpage) mm -> (\(_, _, cnt) -> (q, fromMaybe 1 mpage, cnt)) <$> mm) (current r) msgsE
-              let pgnW = widgetHold_ blank $ ffor pgn $ \(q, p, c) -> paginationNav p c $ \p' -> Route_Search :/ (q, Just p')
-              pgnW >> renderMessages msgsE >> pgnW
+                dynText $ paginatedRouteValue <$> r
+              msgsE <- getMessages r urlForBackendSearchMessages
+              renderMessagesWithPagination r Route_Search msgsE
             Route_Messages -> do
-              r :: Dynamic t Day <- askRoute
+              -- TODO: this is also paginated
+              r :: Dynamic t (PaginatedRoute Day) <- askRoute
+              let day = paginatedRouteValue <$> r
               elClass "h1" "ui header" $ do
                 text "Archive for "
-                dynText $ showDay <$> r
-              dyn_ $ ffor r $ \day -> do
-                routeLink (Route_Messages :/ addDays (-1) day) $ elClass "button" "ui button" $ text "Prev Day"
-              dyn_ $ ffor r $ \day -> do
-                routeLink (Route_Messages :/ addDays 1 day) $ elClass "button" "ui button" $ text "Next Day"
+                dynText $ showDay <$> day
+              dyn_ $ ffor day $ \d -> do
+                routeLink (Route_Messages :/ mkPaginatedRouteAtPage1 (addDays (-1) d)) $ elClass "button" "ui button" $ text "Prev Day"
+              dyn_ $ ffor day $ \d -> do
+                routeLink (Route_Messages :/ mkPaginatedRouteAtPage1 (addDays 1 d)) $ elClass "button" "ui button" $ text "Next Day"
               msgsE <- getMessages r urlForBackendGetMessages
-              renderMessages msgsE
+              renderMessagesWithPagination r Route_Messages msgsE
           divClass "ui bottom attached secondary segment" $ do
             elAttr "a" ("href" =: "https://github.com/srid/Taut") $ text "Powered by Haskell"
   }
   where
     -- TODO: This should point to the very first day in the archives.
-    sampleMsgR = (Route_Messages :/ fromGregorian 2019 3 27)
+    sampleMsgR = (Route_Messages :/ mkPaginatedRouteAtPage1 (fromGregorian 2019 3 27))
+    -- FIXME: refactor after https://github.com/obsidiansystems/obelisk/pull/286#issuecomment-489265962
+    urlForBackendGetMessages pd = "/" <> T.intercalate "/" (["get-messages"] <> encodeDay (paginatedRouteValue pd)) <> "?page" <> (("=" <>) $ T.pack $ show $ paginatedRoutePageIndex pd)
+    urlForBackendSearchMessages pr = "/search-messages/" <> paginatedRouteValue pr <> "?page" <> (("=" <>) $ T.pack $ show $ paginatedRoutePageIndex pr)
+
+    renderMessagesWithPagination r mkR msgsE = do
+      let pgn = attachWithMaybe
+                (\pr mm -> (\(_, pm) -> (paginatedRouteValue pr, pm)) <$> mm)
+                (current r) msgsE
+      let pgnW = widgetHold_ blank $ ffor pgn $ \(q, pm) ->
+            paginationNav pm $ \p' -> mkR :/ (PaginatedRoute (p', q))
+      pgnW >> renderMessages msgsE >> pgnW
 
     getMessages
       :: (Reflex t, MonadHold t m, PostBuild t m, DomBuilder t m, Prerender js t m)
-      => Dynamic t r -> (r -> Text) -> m (Event t (Maybe ([User], [Message], Word)))
+      => Dynamic t r
+      -> (r -> Text)
+      -> m (Event t (Maybe ([User], Paginated Message)))
     getMessages r mkUrl = switchHold never <=< dyn $ ffor r $ \x -> do
       fmap switchDyn $ prerender (pure never) $ do
         pb <- getPostBuild
@@ -112,11 +125,13 @@ frontend = Frontend
     renderMessages msgsE =
       widgetHold_ (divClass "ui loading segment" blank) $ ffor msgsE $ divClass "ui segment" . \case
         Nothing -> text "Something went wrong"
-        Just (users', msgs, _cnt)
+        Just (users', pm)
           | msgs == [] -> text "No results"
           | otherwise -> divClass "ui comments" $ do
               let users = Map.fromList $ ffor users' $ \u -> (_userId u, _userName u)
               forM_ (filter (isJust . _messageChannelName) msgs) $ singleMessage users
+          where
+            msgs = paginatedItems pm
     showDay day = T.pack $ printf "%d-%02d-%02d" y m d
       where
         (y, m, d) = toGregorian day

@@ -43,5 +43,6 @@ project ./. ({ pkgs, hackGet, ... }: {
     vector-sized = doJailbreak (self.callCabal2nix "vector-sized" vector-sized-src {});
     indexed-list-literals = doJailbreak super.indexed-list-literals;
     email-validate = doJailbreak super.email-validate;
+    pagination = dontCheck super.pagination; # https://github.com/mrkkrp/pagination/issues/6
   };
 })

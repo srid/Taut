@@ -28,6 +28,7 @@ import Control.Lens hiding (Bifunctor, bimap, element, universe)
 import Control.Monad
 import Data.GADT.Compare (GEq)
 import Data.Map (Map)
+import GHC.Natural
 import Data.Proxy
 import Data.Some
 import qualified Data.Text as T
@@ -36,6 +37,7 @@ import Prelude
 
 import Obelisk.Route.Frontend
 import Reflex.Dom
+import Data.Pagination
 
 subRouteMenu
   :: (GEq r, DomBuilder t m)
@@ -80,26 +82,26 @@ searchInputWidgetWithRoute dq mkRoute = divClass "ui transparent icon inverted i
     routeLink' (mkRoute q') "i" ("class" =: "search link icon") blank
 
 paginationNav
-  :: forall t m route.
+  :: forall a t m route.
      ( DomBuilder t m
      , RouteToUrl (R route) m
      , SetRoute t (R route) m
      )
-  => Word
-  -> Word
-  -> (Word -> R route)
+  => Paginated a
+  -> (Natural -> R route)
   -> m ()
-paginationNav page cnt mkRoute = do
+paginationNav p mkRoute = when (hasOtherPages p) $ do
+  let idx = pageIndex $ paginatedPagination p
   divClass "ui message" $ do
-    when (page > 1) $
-      routeLink (mkRoute $ page - 1) $
+    when (hasPrevPage p) $
+      routeLink (mkRoute $ idx - 1) $ -- TODO: routes?
         elClass "button" "ui button" $ text "Prev"
     text "Page "
-    text $ T.pack $ show page
+    text $ T.pack $ show idx
     text " of "
-    text $ T.pack $ show cnt
-    when (page < cnt) $
-      routeLink (mkRoute $ 1 + page) $
+    text $ T.pack $ show $ paginatedPagesTotal p
+    when (hasNextPage p) $
+      routeLink (mkRoute $ 1 + idx) $
         elClass "button" "ui button" $ text "Next"
 
 routeLinkClass

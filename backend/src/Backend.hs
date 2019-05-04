@@ -25,6 +25,7 @@ import Data.Time.Calendar
 import Data.Time.Clock
 import System.Directory
 import System.FilePath ((</>))
+import GHC.Natural (Natural)
 
 import Control.Lens.Operators ((<&>))
 import Database.Beam
@@ -33,6 +34,7 @@ import Database.Beam.Sqlite (Sqlite, runBeamSqlite)
 import qualified Database.SQLite.Simple as SQLite
 
 import Snap
+import Data.Pagination
 
 import Obelisk.Backend as Ob
 
@@ -60,63 +62,40 @@ filterQuery = \case
     in filter_ (\msg -> (_messageTs msg >=. val_ fromDate) &&. (_messageTs msg <. val_ toDate))
   Query_Like q -> filter_ (\msg -> (_messageText msg `like_` val_ ("%" <> q <> "%")))
 
-data Pagination = Pagination
-  { _pagination_pageLength :: Word -- ^ Count of items per page
-  , _pagination_page :: Word -- ^ Current page; 0 = first page.
-  }
-  deriving (Eq, Show, Ord)
-
-defaultPagination :: Word -> Pagination
-defaultPagination = Pagination defaultLimit
-  where
-    defaultLimit = 10 -- TODO: change after finishing testing.
-
-paginationOffset :: Pagination -> Word
-paginationOffset (Pagination c i) = i * c
-
-paginationPageCount :: Pagination -> Word -> Word
-paginationPageCount (Pagination l _) total = case total `divMod` l of
-  (x, 0) -> x
-  (x, _) -> x + 1
 
 backend :: Backend BackendRoute Route
 backend = Backend
   { _backend_routeEncoder = backendRouteEncoder
   , _backend_run = \serve -> do
       liftIO populateDatabase
+      let defaultPageSize = 10 :: Natural -- TODO: increase
+          mkTautPagination :: Natural -> IO Pagination = liftIO . mkPagination defaultPageSize
+          routeToPagination (PaginatedRoute (p, _)) = mkTautPagination p
       serve $ \case
         BackendRoute_Missing :=> Identity () -> do
           writeLBS "404"
-        BackendRoute_GetMessages :=> Identity day -> do
-          resp <- queryMessages (Query_Day day) Nothing
+        BackendRoute_GetMessages :=> Identity pDay -> do
+          pagination :: Pagination <- liftIO $ routeToPagination pDay
+          resp <- queryMessages (Query_Day $ paginatedRouteValue pDay) $ pagination
           writeLBS $ encode resp
-        BackendRoute_SearchMessages :=> Identity (query, mpage) -> do
-          let pagination = defaultPagination . (\x -> x - 1) $ fromMaybe 1 mpage
-          resp <- queryMessages (Query_Like query) $ Just pagination
+        BackendRoute_SearchMessages :=> Identity pQuery -> do
+          pagination :: Pagination <- liftIO $ routeToPagination pQuery
+          resp <- queryMessages (Query_Like $ paginatedRouteValue pQuery) $ pagination
           writeLBS $ encode resp
   }
   where
-    queryMessages q (mpagination :: Maybe Pagination) = do
-      liftIO $ SQLite.withConnection dbFile $ \conn -> do
-        total :: Int <- fmap (fromMaybe 0) $ runBeamSqlite conn $
-          runSelectReturningOne $
-          select $ do
-            aggregate_ (\_ -> countAll_) $ filterQuery q $ all_ (_slackMessages slackDb)
-        msgs :: [Message] <- runBeamSqlite conn $ do
-          runSelectReturningList $ select $ do
-            -- TODO: refactor
-            case mpagination of
-              Nothing ->
-                orderBy_ (asc_ . _messageTs) $ filterQuery q $ all_ (_slackMessages slackDb)
-              Just p -> paginate p $
-                orderBy_ (asc_ . _messageTs) $ filterQuery q $ all_ (_slackMessages slackDb)
-        -- TODO: separate endpoint for this?
-        users :: [User] <- runBeamSqlite conn $
+    queryMessages q (p :: Pagination) = do
+      liftIO $ SQLite.withConnection dbFile $ \conn -> runBeamSqlite conn $ do
+        total <- fmap (fromMaybe 0) $ runSelectReturningOne $
+          select $ aggregate_ (\_ -> countAll_) $ filterQuery q $ all_ (_slackMessages slackDb)
+        msgs :: Paginated Message <- paginate p (fromIntegral total) $ \offset limit ->
           runSelectReturningList $ select $
-            all_ (_slackUsers slackDb)
-        let pages :: Word = fromMaybe 1 $ flip paginationPageCount (fromIntegral total) <$> mpagination
-        pure (users, msgs, pages)
-    paginate p = limit_ (toInteger $ _pagination_pageLength p) . offset_ (toInteger $ paginationOffset p)
+            limit_ limit $ offset_ offset $
+              orderBy_ (asc_ . _messageTs) $ filterQuery q $ all_ (_slackMessages slackDb)
+        -- TODO: separate endpoint for this?
+        users :: [User] <- runSelectReturningList $
+          select $ all_ (_slackUsers slackDb)
+        pure (users, msgs)
 
 rootDir :: String
 rootDir = "/home/srid/code/Taut/tmp"

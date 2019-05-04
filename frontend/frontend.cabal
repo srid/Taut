@@ -19,6 +19,7 @@ library
                , time
                , lens
                , modern-uri
+               , pagination
                , jsaddle
                , mtl
   exposed-modules:
@@ -44,6 +45,7 @@ executable frontend
                , time
                , lens
                , modern-uri
+               , pagination
                , jsaddle
                , mtl
   --TODO: Make these ghc-options optional

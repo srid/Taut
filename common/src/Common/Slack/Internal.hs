@@ -27,3 +27,4 @@ parseSlackTimestamp ts' = case readMaybe (T.unpack ts') of
 -- NOTE: it does not; loses the double precision. do we care?
 formatSlackTimestamp :: UTCTime -> Text
 formatSlackTimestamp t = T.pack $ show $ (realToFrac (utcTimeToPOSIXSeconds t) :: Double)
+
