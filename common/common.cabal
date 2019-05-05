@@ -11,6 +11,7 @@ library
                , containers
                , dependent-sum
                , dependent-sum-template
+               , obelisk-oauth-common
                , obelisk-route
                , mtl
                , pagination

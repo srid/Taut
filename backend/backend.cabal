@@ -10,6 +10,8 @@ library
   build-depends: base
                , common
                , frontend
+               , obelisk-oauth-backend
+               , obelisk-oauth-common
                , obelisk-backend
                , aeson
                , beam-core
@@ -53,6 +55,8 @@ executable backend
                , beam-core
                , beam-sqlite
                , sqlite-simple
+               , obelisk-oauth-backend
+               , obelisk-oauth-common
                , obelisk-backend
                , obelisk-executable-config
                , obelisk-executable-config-inject
