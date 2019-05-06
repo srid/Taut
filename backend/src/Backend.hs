@@ -102,8 +102,11 @@ backend = Backend
               t
             resp <- liftIO $ httpLbs req $ _backendConfig_tlsMgr cfg
             -- TODO: check response errors (both code and body json)!
-            setSlackTokenToCookie cfg $ decode $ responseBody resp
-            redirect $ T.encodeUtf8 $ fromMaybe (renderFrontendRoute (_backendConfig_enc cfg) $ Route_Home :/ ()) mstate
+            case decode (responseBody resp) of
+              Nothing -> liftIO $ throwString "Unable to decode JSON from Slack oauth.access response"
+              Just str -> do
+                setSlackTokenToCookie cfg str
+                redirect $ T.encodeUtf8 $ fromMaybe (renderFrontendRoute (_backendConfig_enc cfg) $ Route_Home :/ ()) mstate
         BackendRoute_GetMessages :/ pDay -> do
           -- TODO: Use MonadError wherever possible
           resp <- authorizeUser cfg (Route_Messages :/ pDay) >>= \case

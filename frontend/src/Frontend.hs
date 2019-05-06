@@ -137,7 +137,7 @@ frontend = Frontend
       :: (Reflex t, MonadHold t m, PostBuild t m, DomBuilder t m, Prerender js t m)
       => Dynamic t r
       -> (r -> Text)
-      -> m (Event t (Maybe (Either NotAuthorized (SlackTokenResponse, ([User], Paginated Message)))))
+      -> m (Event t (Maybe (Either NotAuthorized (Maybe SlackTokenResponse, ([User], Paginated Message)))))
     getMessages r mkUrl = switchHold never <=< dyn $ ffor r $ \x -> do
       fmap switchDyn $ prerender (pure never) $ do
         pb <- getPostBuild

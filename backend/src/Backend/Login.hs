@@ -30,10 +30,10 @@ import Backend.Config
 
 allowAnonymousOnLocalhost
   :: BackendConfig
-  -> Either NotAuthorized (Maybe SlackTokenResponse)
-  -> Either NotAuthorized (Maybe SlackTokenResponse)
+  -> Either NotAuthorized SlackTokenResponse
+  -> Either NotAuthorized SlackTokenResponse
 allowAnonymousOnLocalhost cfg = if T.isPrefixOf "http://localhost:" (_backendConfig_routeEnv cfg)
-  then Right . either (const $ Just aWithLocal) id
+  then Right . either (const aWithLocal) id
   else id
   where
     aWithLocal = SlackTokenResponse
@@ -48,7 +48,7 @@ authorizeUser
   :: MonadSnap m
   => BackendConfig
   -> R Route  -- ^ The route to redirect after signing in to Slack
-  -> m (Either NotAuthorized (Maybe SlackTokenResponse))
+  -> m (Either NotAuthorized SlackTokenResponse)
 authorizeUser cfg r = do
   tok <- getAuthToken (_backendConfig_sessKey cfg)
   pure $ rmap (allowAnonymousOnLocalhost cfg) f tok
@@ -59,13 +59,15 @@ authorizeUser cfg r = do
         -- of the frontend (where it would be most appropriate) is because of a
         -- bug in obelisk missing exe-config (we need routeEnv) in the frontend
         -- post hydration.
-        Left $ NotAuthorized_RequireLogin $
-          mkSlackLoginLink cfg $ Just $ renderFrontendRoute (_backendConfig_enc cfg) r
+        Left requireLogin
       Just (_, v) ->
-        Right $ decode v
+        maybe (Left requireLogin) Right $ decode v
+
+    requireLogin = NotAuthorized_RequireLogin $
+      mkSlackLoginLink cfg $ Just $ renderFrontendRoute (_backendConfig_enc cfg) r
+
   
--- FIXME: Why is this a Maybe?
-setSlackTokenToCookie :: MonadSnap m => BackendConfig -> Maybe SlackTokenResponse -> m ()
+setSlackTokenToCookie :: MonadSnap m => BackendConfig -> SlackTokenResponse -> m ()
 setSlackTokenToCookie cfg = setAuthToken (_backendConfig_sessKey cfg) . encode
 
 mkSlackLoginLink :: BackendConfig -> Maybe Text -> Text
