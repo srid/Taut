@@ -4,6 +4,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
@@ -54,7 +55,7 @@ frontend = Frontend
       elAttr "link" ("rel" =: "stylesheet" <> "type" =: "text/css" <> "href" =: static @"semantic.min.css") blank
   , _frontend_body = do
       divClass "ui container" $ do
-        divClass "ui attached segment" $ do
+        divClass "ui attached segment" $ mdo
           let itemClass active = bool "item" "active item" <$> active
           divClass "ui pointing inverted menu" $ subRouteMenu
             [ ( This Route_Home
@@ -64,7 +65,9 @@ frontend = Frontend
               , \isActive -> routeLinkClass sampleMsgR (itemClass isActive) $ text "Archive"
               )
             , ( This Route_Search
-              , \isActive -> divClass "right menu" $
+              , \isActive -> divClass "right menu" $ do
+                  widgetHold_ blank $ ffor userE $ \(SlackUser name _) ->
+                    divClass "item" $ text $ "Welcome " <> name
                   elDynClass "div" (itemClass isActive) $ do
                     -- FIXME: On hard page refresh the query is not being set as initial value in input.
                     query <- fmap join $ subRoute $ \case
@@ -73,11 +76,10 @@ frontend = Frontend
                     searchInputWidgetWithRoute query $ \q' -> Route_Search :/ (PaginatedRoute (1, q'))
               )
             ]
-          divClass "ui segment" $ subRoute_ $ \case
+          userE :: Event t SlackUser <- divClass "ui segment" $ fmap switchDyn $ subRoute $ \case
             Route_Home -> el "p" $ do
-              text "Welcome to Taut, the Slack archive viewer. This app is a work in progress. Meanwhile, "
-              routeLink sampleMsgR $ text "start from 2019/3/27"
-              text "?"
+              text "Welcome to Taut, the Slack archive viewer. Click 'Archive' or do a search."
+              pure never
             Route_Search -> do
               r  :: Dynamic t (PaginatedRoute Text) <- askRoute
               elClass "h1" "ui header" $ do
@@ -87,9 +89,9 @@ frontend = Frontend
               widgetHold_ (divClass "ui loading segment" blank) $ ffor resp $ \case
                 Nothing -> text "Something went wrong"
                 Just (Left na) -> notAuthorizedWidget na
-                Just (Right (t, v)) -> do
-                  divClass "ui segment" $ text $ T.pack $ show t
+                Just (Right (_, v)) -> do
                   renderMessagesWithPagination r Route_Search v
+              pure $ fmap fst $ filterRight $ fforMaybe resp id
             Route_Messages -> do
               -- TODO: this is also paginated
               r :: Dynamic t (PaginatedRoute Day) <- askRoute
@@ -101,13 +103,13 @@ frontend = Frontend
               widgetHold_ (divClass "ui loading segment" blank) $ ffor resp $ \case
                 Nothing -> text "Something went wrong"
                 Just (Left na) -> notAuthorizedWidget na
-                Just (Right (t, v)) -> do
-                  divClass "ui segment" $ text $ T.pack $ show t
+                Just (Right (_, v)) -> do
                   dyn_ $ ffor day $ \d -> do
                     routeLink (Route_Messages :/ mkPaginatedRouteAtPage1 (addDays (-1) d)) $ elClass "button" "ui button" $ text "Prev Day"
                   dyn_ $ ffor day $ \d -> do
                     routeLink (Route_Messages :/ mkPaginatedRouteAtPage1 (addDays 1 d)) $ elClass "button" "ui button" $ text "Next Day"
                   renderMessagesWithPagination r Route_Messages v
+              pure $ fmap fst $ filterRight $ fforMaybe resp id
           divClass "ui bottom attached secondary segment" $ do
             elAttr "a" ("href" =: "https://github.com/srid/Taut") $ text "Powered by Haskell"
   }
@@ -137,7 +139,7 @@ frontend = Frontend
       :: (Reflex t, MonadHold t m, PostBuild t m, DomBuilder t m, Prerender js t m)
       => Dynamic t r
       -> (r -> Text)
-      -> m (Event t (Maybe (Either NotAuthorized (Maybe SlackTokenResponse, ([User], Paginated Message)))))
+      -> m (Event t (Maybe (Either NotAuthorized (SlackUser, ([User], Paginated Message)))))
     getMessages r mkUrl = switchHold never <=< dyn $ ffor r $ \x -> do
       fmap switchDyn $ prerender (pure never) $ do
         pb <- getPostBuild

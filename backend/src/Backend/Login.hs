@@ -37,7 +37,7 @@ authorizeUser
   :: MonadSnap m
   => BackendConfig
   -> R Route  -- ^ The route to redirect after signing in to Slack
-  -> m (Either NotAuthorized SlackTokenResponse)
+  -> m (Either NotAuthorized SlackUser)
 authorizeUser cfg r = do
   tok <- getAuthToken (_backendConfig_sessKey cfg)
   pure $ rmap allowAnonymousOnLocalhost f tok
@@ -51,7 +51,8 @@ authorizeUser cfg r = do
           | not (_slackTokenResponse_ok t) -> Left $ NotAuthorized_RequireLogin ll
           | _slackTokenResponse_team t /= _backendConfig_team cfg ->
             Left $ NotAuthorized_WrongTeam (_backendConfig_team cfg) ll
-          | otherwise -> Right t
+          | otherwise -> Right $ _slackTokenResponse_user t
+
 
     -- NOTE: The only reason we build the grantHref in the backend instead
     -- of the frontend (where it would be most appropriate) is because of a
@@ -60,20 +61,14 @@ authorizeUser cfg r = do
     ll = mkSlackLoginLink cfg $ Just $ renderFrontendRoute (_backendConfig_enc cfg) r
 
     allowAnonymousOnLocalhost
-      :: Either NotAuthorized SlackTokenResponse
-      -> Either NotAuthorized SlackTokenResponse
+      :: Either NotAuthorized SlackUser
+      -> Either NotAuthorized SlackUser
     allowAnonymousOnLocalhost = if T.isPrefixOf "http://localhost:" (_backendConfig_routeEnv cfg)
-      then Right . either (const aWithLocal) id
+      then Right . either (const dummyUser) id
       else id
       where
-        aWithLocal = SlackTokenResponse
-          { _slackTokenResponse_ok = True
-          , _slackTokenResponse_accessToken = "xoxp-dummy"
-          , _slackTokenResponse_scope = "identity.basic"
-          , _slackTokenResponse_user = SlackUser "localbody" "U11111111"
-          , _slackTokenResponse_team = SlackTeam "T11111111"
-          }
-   
+        dummyUser = SlackUser "localbody" "U11111111"
+
 setSlackTokenToCookie :: MonadSnap m => BackendConfig -> SlackTokenResponse -> m ()
 setSlackTokenToCookie cfg = setAuthToken (_backendConfig_sessKey cfg) . encode
 

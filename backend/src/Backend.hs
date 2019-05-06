@@ -45,7 +45,7 @@ import Obelisk.Route hiding (decode, encode)
 
 import Common.Route
 import Common.Slack.Types
-import Common.Slack.Types.Auth (SlackTeam(..))
+import Common.Slack.Types.Auth (SlackTeam (..))
 
 import Backend.Config
 import Backend.Login
