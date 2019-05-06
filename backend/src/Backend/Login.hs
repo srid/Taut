@@ -18,34 +18,41 @@ import Snap
 import Snap.Snaplet.Session
 import Web.ClientSession
 
+import Obelisk.Route hiding (decode, encode)
 import Obelisk.OAuth.Authorization
 
 import Common.Slack.Types.Auth
+import Common.Route
 
 import Backend.Config
 
-getSlackTokenFromCookie :: MonadSnap m => BackendConfig -> m (Either Text (Maybe SlackTokenResponse))
-getSlackTokenFromCookie cfg = getAuthToken (_backendConfig_sessKey cfg) >>= \case
+getSlackTokenFromCookie
+  :: MonadSnap m
+  => BackendConfig
+  -> R Route  -- ^ The route to redirect after signing in to Slack
+  -> m (Either Text (Maybe SlackTokenResponse))
+getSlackTokenFromCookie cfg r = getAuthToken (_backendConfig_sessKey cfg) >>= \case
   Nothing ->
     -- NOTE: The oreason we build the grantHref in the backend instead
     -- of the frontend (where it would be most appropriate) is because of a
     -- bug in obelisk missing exe-config (we need routeEnv) in the frontend
     -- post hydration.
-    pure $ Left $ mkSlackLoginLink cfg
+    pure $ Left $ mkSlackLoginLink cfg $ Just $ renderFrontendRoute (_backendConfig_enc cfg) r
   Just (_, v) ->
     pure $ Right $ decode v
 -- FIXME: Why is this a Maybe?
 setSlackTokenToCookie :: MonadSnap m => BackendConfig -> Maybe SlackTokenResponse -> m ()
 setSlackTokenToCookie cfg = setAuthToken (_backendConfig_sessKey cfg) . encode
-mkSlackLoginLink :: BackendConfig -> Text
-mkSlackLoginLink cfg = authorizationRequestHref authUrl routeEnv enc r
+
+mkSlackLoginLink :: BackendConfig -> Maybe Text -> Text
+mkSlackLoginLink cfg mstate = authorizationRequestHref authUrl routeEnv enc r
   where
     r = AuthorizationRequest
         { _authorizationRequest_responseType = AuthorizationResponseType_Code
         , _authorizationRequest_clientId = _backendConfig_oauthClientID cfg
         , _authorizationRequest_redirectUri = Nothing -- Just BackendRoute_OAuth
         , _authorizationRequest_scope = ["identity.basic"]
-        , _authorizationRequest_state = Just "none"
+        , _authorizationRequest_state = mstate
         }
     authUrl = "https://slack.com/oauth/authorize"
     routeEnv = _backendConfig_routeEnv cfg

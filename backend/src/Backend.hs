@@ -84,7 +84,7 @@ backend = Backend
           writeLBS "404"
         BackendRoute_OAuth :/ OAuth_RedirectUri :/ p -> case p of
           Nothing -> liftIO $ throwString "Expected to receive the authorization code here"
-          Just (RedirectUriParams code _mstate) -> do
+          Just (RedirectUriParams code mstate) -> do
             let t = TokenRequest
                   { _tokenRequest_grant = TokenGrant_AuthorizationCode $ T.encodeUtf8 code
                   , _tokenRequest_clientId = _backendConfig_oauthClientID cfg
@@ -102,10 +102,10 @@ backend = Backend
             resp <- liftIO $ httpLbs req $ _backendConfig_tlsMgr cfg
             -- TODO: check response errors (both code and body json)!
             setSlackTokenToCookie cfg $ decode $ responseBody resp
-            -- TODO: redirect after
+            redirect $ T.encodeUtf8 $ fromMaybe (renderFrontendRoute (_backendConfig_enc cfg) $ Route_Home :/ ()) mstate
         BackendRoute_GetMessages :/ pDay -> do
           -- TODO: Use MonadError wherever possible
-          resp <- getSlackTokenFromCookie cfg >>= \case
+          resp <- getSlackTokenFromCookie cfg (Route_Messages :/ pDay) >>= \case
             Left e -> pure $ Left e
             Right t -> do
               pagination <- liftIO $ mkPaginationFromRoute cfg pDay
@@ -113,7 +113,7 @@ backend = Backend
               pure $ Right (t, resp)
           writeLBS $ encode resp
         BackendRoute_SearchMessages :/ pQuery -> do
-          resp <- getSlackTokenFromCookie cfg >>= \case
+          resp <- getSlackTokenFromCookie cfg (Route_Search :/ pQuery) >>= \case
             Left e -> pure $ Left e
             Right t -> do
               pagination <- liftIO $ mkPaginationFromRoute cfg pQuery

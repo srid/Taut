@@ -41,7 +41,6 @@ paginatedRoutePageIndex = fst . unPaginatedRoute
 paginatedRouteValue :: PaginatedRoute a -> a
 paginatedRouteValue = snd . unPaginatedRoute
 
---TODO: Should we rename `Route` to `AppRoute`?
 data BackendRoute :: * -> * where
   -- | Used to handle unparseable routes.
   BackendRoute_Missing :: BackendRoute ()
