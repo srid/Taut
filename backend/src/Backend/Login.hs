@@ -2,18 +2,22 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 -- Slack login and how we use that to authorize users
-module Backend.Login where
+module Backend.Login
+  ( authorizeUser
+  , setSlackTokenToCookie
+  ) where
 
 import Control.Monad
 import Data.Aeson
 import qualified Data.ByteString.Lazy as BL
 import Data.Maybe (catMaybes, listToMaybe)
-import Data.Text (Text)
 import Data.Profunctor (rmap)
+import Data.Text (Text)
 import qualified Data.Text as T
 
 import Snap
@@ -28,21 +32,6 @@ import Common.Slack.Types.Auth
 
 import Backend.Config
 
-allowAnonymousOnLocalhost
-  :: BackendConfig
-  -> Either NotAuthorized SlackTokenResponse
-  -> Either NotAuthorized SlackTokenResponse
-allowAnonymousOnLocalhost cfg = if T.isPrefixOf "http://localhost:" (_backendConfig_routeEnv cfg)
-  then Right . either (const aWithLocal) id
-  else id
-  where
-    aWithLocal = SlackTokenResponse
-      { _slackTokenResponse_ok = True
-      , _slackTokenResponse_accessToken = "xoxp-dummy"
-      , _slackTokenResponse_scope = "identity.basic"
-      , _slackTokenResponse_user = SlackUser "localbody" "U11111111"
-      , _slackTokenResponse_team = SlackTeam "T11111111"
-      }
 
 authorizeUser
   :: MonadSnap m
@@ -51,22 +40,40 @@ authorizeUser
   -> m (Either NotAuthorized SlackTokenResponse)
 authorizeUser cfg r = do
   tok <- getAuthToken (_backendConfig_sessKey cfg)
-  pure $ rmap (allowAnonymousOnLocalhost cfg) f tok
+  pure $ rmap allowAnonymousOnLocalhost f tok
   where
     f = \case
       Nothing ->
-        -- NOTE: The oreason we build the grantHref in the backend instead
-        -- of the frontend (where it would be most appropriate) is because of a
-        -- bug in obelisk missing exe-config (we need routeEnv) in the frontend
-        -- post hydration.
-        Left requireLogin
-      Just (_, v) ->
-        maybe (Left requireLogin) Right $ decode v
+        Left $ NotAuthorized_RequireLogin ll
+      Just (_, v) -> case decode v of
+        Nothing -> Left $ NotAuthorized_RequireLogin ll
+        Just t -> if
+          | not (_slackTokenResponse_ok t) -> Left $ NotAuthorized_RequireLogin ll
+          | _slackTokenResponse_team t /= _backendConfig_team cfg ->
+            Left $ NotAuthorized_WrongTeam (_backendConfig_team cfg) ll
+          | otherwise -> Right t
 
-    requireLogin = NotAuthorized_RequireLogin $
-      mkSlackLoginLink cfg $ Just $ renderFrontendRoute (_backendConfig_enc cfg) r
+    -- NOTE: The only reason we build the grantHref in the backend instead
+    -- of the frontend (where it would be most appropriate) is because of a
+    -- bug in obelisk missing exe-config (we need routeEnv) in the frontend
+    -- post hydration.
+    ll = mkSlackLoginLink cfg $ Just $ renderFrontendRoute (_backendConfig_enc cfg) r
 
-  
+    allowAnonymousOnLocalhost
+      :: Either NotAuthorized SlackTokenResponse
+      -> Either NotAuthorized SlackTokenResponse
+    allowAnonymousOnLocalhost = if T.isPrefixOf "http://localhost:" (_backendConfig_routeEnv cfg)
+      then Right . either (const aWithLocal) id
+      else id
+      where
+        aWithLocal = SlackTokenResponse
+          { _slackTokenResponse_ok = True
+          , _slackTokenResponse_accessToken = "xoxp-dummy"
+          , _slackTokenResponse_scope = "identity.basic"
+          , _slackTokenResponse_user = SlackUser "localbody" "U11111111"
+          , _slackTokenResponse_team = SlackTeam "T11111111"
+          }
+   
 setSlackTokenToCookie :: MonadSnap m => BackendConfig -> SlackTokenResponse -> m ()
 setSlackTokenToCookie cfg = setAuthToken (_backendConfig_sessKey cfg) . encode
 
