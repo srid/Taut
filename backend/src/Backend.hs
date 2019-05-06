@@ -11,6 +11,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 module Backend where
 
+import Control.Exception.Safe (Exception, throwIO)
 import Control.Lens.Operators ((<&>))
 import Control.Monad
 import Data.Aeson
@@ -73,23 +74,54 @@ filterQuery = \case
     in filter_ (\msg -> (_messageTs msg >=. val_ fromDate) &&. (_messageTs msg <. val_ toDate))
   Query_Like q -> filter_ (\msg -> (_messageText msg `like_` val_ ("%" <> q <> "%")))
 
+data BackendConfig = BackendConfig
+  { _backendConfig_enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute Route))) PageName
+  , _backendConfig_sessKey :: Key
+  , _backendConfig_tlsMgr :: Manager
+  , _backendConfig_routeEnv :: Text
+  , _backendConfig_oauthClientID :: Text  -- TODO: invariant for oauth format?
+  , _backendConfig_oauthClientSecret :: Text
+  }
+
+data InvalidConfig
+  = InvalidConfig_Missing Text
+  | InvalidConfig_Empty Text
+  deriving (Eq, Show, Ord)
+
+instance Exception InvalidConfig
+
+readBackendConfig :: IO BackendConfig
+readBackendConfig = BackendConfig enc
+  <$> (snd <$> randomKey)
+  <*> newTlsManager
+  <*> getConfigNonEmpty "config/common/route"
+  <*> getConfigNonEmpty "config/backend/oauthClientID"
+  <*> getConfigNonEmpty "config/backend/oauthClientSecret"
+  where
+    Right (enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute Route))) PageName) = checkEncoder backendRouteEncoder
+    getConfigNonEmpty p = Cfg.get p >>= \case
+      Nothing -> throwIO $ InvalidConfig_Missing p
+      Just v' -> do
+        let v = T.strip v'
+        if T.null v then throwIO (InvalidConfig_Empty p) else pure v
 
 backend :: Backend BackendRoute Route
 backend = Backend
   { _backend_routeEncoder = backendRouteEncoder
   , _backend_run = \serve -> do
-      Just routeEnv <- liftIO $ fmap T.strip <$> Cfg.get "config/common/route"
-      Just oauthClientID <- liftIO $ fmap T.strip <$> Cfg.get "config/backend/oauthClientID"
-      Just oauthClientSecret <- liftIO $ fmap T.strip <$> Cfg.get "config/backend/oauthClientSecret"
+      cfg <- readBackendConfig
+      liftIO $ T.putStrLn $ "routeEnv: " <> _backendConfig_routeEnv cfg
+      -- Just routeEnv <- liftIO $ fmap T.strip <$> Cfg.get "config/common/route"
+      -- Just oauthClientID <- liftIO $ fmap T.strip <$> Cfg.get "config/backend/oauthClientID"
+      -- Just oauthClientSecret <- liftIO $ fmap T.strip <$> Cfg.get "config/backend/oauthClientSecret"
 
-      liftIO $ T.putStrLn $ "routeEnv: " <> routeEnv
       liftIO populateDatabase
-      tlsMgr <- liftIO $ newTlsManager
-      (_, sessKey) <- liftIO randomKey
+      -- tlsMgr <- liftIO $ newTlsManager
+      -- (_, sessKey) <- liftIO randomKey
       let defaultPageSize = 30 :: Natural
           mkTautPagination :: Natural -> IO Pagination = liftIO . mkPagination defaultPageSize
           routeToPagination (PaginatedRoute (p, _)) = mkTautPagination p
-      let Right (enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute Route))) PageName) = checkEncoder backendRouteEncoder
+      -- let Right (enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute Route))) PageName) = checkEncoder backendRouteEncoder
 
       serve $ \case
         BackendRoute_Missing :/ () -> do
@@ -99,20 +131,24 @@ backend = Backend
           Just (RedirectUriParams code _mstate) -> do
             let t = TokenRequest
                   { _tokenRequest_grant = TokenGrant_AuthorizationCode $ T.encodeUtf8 code
-                  , _tokenRequest_clientId = oauthClientID
-                  , _tokenRequest_clientSecret = oauthClientSecret
+                  , _tokenRequest_clientId = _backendConfig_oauthClientID cfg
+                  , _tokenRequest_clientSecret = _backendConfig_oauthClientSecret cfg
                   , _tokenRequest_redirectUri = BackendRoute_OAuth
                   }
                 reqUrl = "https://slack.com/api/oauth.access"
             -- let reqUrlDev = "https://webhook.site/f29fb6f2-ff15-412d-9e8f-d1b82c4682ad"
             --     routeEnvDev = "http://4ed5742f.ngrok.io"
-            req <- liftIO $ getOauthToken reqUrl routeEnv enc t
-            r <- liftIO $ flip httpLbs tlsMgr req
+            req <- liftIO $ getOauthToken
+              reqUrl
+              (_backendConfig_routeEnv cfg)
+              (_backendConfig_enc cfg)
+              t
+            r <- liftIO $ flip httpLbs (_backendConfig_tlsMgr cfg) req
             let tokenResponse :: Maybe SlackTokenResponse = decode $ responseBody r
-            setAuthToken sessKey $ encode tokenResponse
+            setAuthToken (_backendConfig_sessKey cfg) $ encode tokenResponse
             liftIO $ putStrLn $ show tokenResponse
         BackendRoute_GetMessages :/ pDay -> do
-          resp <- getSlackToken enc oauthClientID routeEnv sessKey >>= \case
+          resp <- getSlackTokenFromCookie cfg >>= \case
             Left e -> pure $ Left e
             Right t -> do
               pagination :: Pagination <- liftIO $ routeToPagination pDay
@@ -120,7 +156,7 @@ backend = Backend
               pure $ Right (t, resp)
           writeLBS $ encode resp
         BackendRoute_SearchMessages :/ pQuery -> do
-          resp <- getSlackToken enc oauthClientID routeEnv sessKey >>= \case
+          resp <- getSlackTokenFromCookie cfg >>= \case
             Left e -> pure $ Left e
             Right t -> do
               pagination :: Pagination <- liftIO $ routeToPagination pQuery
@@ -130,21 +166,29 @@ backend = Backend
         _ -> undefined -- FIXME: wtf why does the compiler require this?
   }
   where
-    getSlackToken enc oauthClientID routeEnv k = getAuthToken k >>= \case
-      Nothing -> do
-        let r = AuthorizationRequest
-              { _authorizationRequest_responseType = AuthorizationResponseType_Code
-              , _authorizationRequest_clientId = oauthClientID
-              , _authorizationRequest_redirectUri = Nothing -- Just BackendRoute_OAuth
-              , _authorizationRequest_scope = ["identity.basic"]
-              , _authorizationRequest_state = Just "none"
-              }
-            authUrl = "https://slack.com/oauth/authorize"
-            grantHref = authorizationRequestHref authUrl routeEnv enc r
-        pure $ Left grantHref
-      Just (_, v) -> do
-        let t :: Maybe SlackTokenResponse = decode v
-        pure $ Right t
+    getSlackTokenFromCookie :: MonadSnap m => BackendConfig -> m (Either Text (Maybe SlackTokenResponse))
+    getSlackTokenFromCookie cfg = getAuthToken (_backendConfig_sessKey cfg) >>= \case
+      Nothing ->
+        -- NOTE: The oreason we build the grantHref in the backend instead
+        -- of the frontend (where it would be most appropriate) is because of a
+        -- bug in obelisk missing exe-config (we need routeEnv) in the frontend
+        -- post hydration.
+        pure $ Left $ mkSlackLoginLink cfg
+      Just (_, v) ->
+        pure $ Right $ decode v
+    mkSlackLoginLink :: BackendConfig -> Text
+    mkSlackLoginLink cfg = authorizationRequestHref authUrl routeEnv enc r
+      where
+        r = AuthorizationRequest
+            { _authorizationRequest_responseType = AuthorizationResponseType_Code
+            , _authorizationRequest_clientId = _backendConfig_oauthClientID cfg
+            , _authorizationRequest_redirectUri = Nothing -- Just BackendRoute_OAuth
+            , _authorizationRequest_scope = ["identity.basic"]
+            , _authorizationRequest_state = Just "none"
+            }
+        authUrl = "https://slack.com/oauth/authorize"
+        routeEnv = _backendConfig_routeEnv cfg
+        enc = _backendConfig_enc cfg
     setAuthToken k t = setSecureCookie "tautAuthToken" Nothing k Nothing (t :: BL.ByteString)
     getAuthToken :: MonadSnap m => Key -> m (Maybe (SecureCookie BL.ByteString))
     getAuthToken k = do

@@ -31,6 +31,7 @@ library
                , obelisk-backend
                , dependent-sum
                , dependent-sum-template
+               , safe-exceptions
                , mmark
                , modern-uri
                , pagination
@@ -56,6 +57,7 @@ executable backend
                , frontend
                , lens
                , modern-uri
+               , safe-exceptions
                , bytestring
                , beam-core
                , beam-sqlite

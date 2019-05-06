@@ -4,6 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
+-- | Types for working with Slack's OAuth interface
 module Common.Slack.Types.Auth where
 
 import Data.Aeson
@@ -35,15 +36,14 @@ data SlackTeam = SlackTeam
 -- | Slack's OAuth JSON field label modifier
 fieldLabelMod :: Options
 fieldLabelMod = defaultOptions
-  { fieldLabelModifier =  toQuietSnake . fromHumps . drop 1 . dropWhile (/= '_') . drop 1
+  { fieldLabelModifier =
+      toQuietSnake . fromHumps . drop 1 . dropWhile (/= '_') . drop 1
   }
 
 instance FromJSON SlackTokenResponse where
   parseJSON = genericParseJSON fieldLabelMod
-
 instance FromJSON SlackUser where
   parseJSON = genericParseJSON fieldLabelMod
-
 instance FromJSON SlackTeam where
   parseJSON = genericParseJSON fieldLabelMod
 
