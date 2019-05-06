@@ -8,38 +8,60 @@
 -- Slack login and how we use that to authorize users
 module Backend.Login where
 
-import Data.Aeson
-import Data.Maybe (catMaybes, listToMaybe)
 import Control.Monad
-import Data.Text (Text)
+import Data.Aeson
 import qualified Data.ByteString.Lazy as BL
+import Data.Maybe (catMaybes, listToMaybe)
+import Data.Text (Text)
+import Data.Profunctor (rmap)
+import qualified Data.Text as T
 
 import Snap
 import Snap.Snaplet.Session
 import Web.ClientSession
 
-import Obelisk.Route hiding (decode, encode)
 import Obelisk.OAuth.Authorization
+import Obelisk.Route hiding (decode, encode)
 
-import Common.Slack.Types.Auth
 import Common.Route
+import Common.Slack.Types.Auth
 
 import Backend.Config
+
+allowAnonymousOnLocalhost
+  :: BackendConfig
+  -> Either Text (Maybe SlackTokenResponse)
+  -> Either Text (Maybe SlackTokenResponse)
+allowAnonymousOnLocalhost cfg = if T.isPrefixOf "http://localhost:" (_backendConfig_routeEnv cfg)
+  then Right . either (const $ Just aWithLocal) id
+  else id
+  where
+    aWithLocal = SlackTokenResponse
+      { _slackTokenResponse_ok = True
+      , _slackTokenResponse_accessToken = "xoxp-dummy"
+      , _slackTokenResponse_scope = "identity.basic"
+      , _slackTokenResponse_user = SlackUser "localbody" "U11111111"
+      , _slackTokenResponse_team = SlackTeam "T11111111"
+      }
 
 getSlackTokenFromCookie
   :: MonadSnap m
   => BackendConfig
   -> R Route  -- ^ The route to redirect after signing in to Slack
   -> m (Either Text (Maybe SlackTokenResponse))
-getSlackTokenFromCookie cfg r = getAuthToken (_backendConfig_sessKey cfg) >>= \case
-  Nothing ->
-    -- NOTE: The oreason we build the grantHref in the backend instead
-    -- of the frontend (where it would be most appropriate) is because of a
-    -- bug in obelisk missing exe-config (we need routeEnv) in the frontend
-    -- post hydration.
-    pure $ Left $ mkSlackLoginLink cfg $ Just $ renderFrontendRoute (_backendConfig_enc cfg) r
-  Just (_, v) ->
-    pure $ Right $ decode v
+getSlackTokenFromCookie cfg r =
+  rmap (allowAnonymousOnLocalhost cfg) f <$> getAuthToken (_backendConfig_sessKey cfg)
+  where
+    f = \case
+      Nothing ->
+        -- NOTE: The oreason we build the grantHref in the backend instead
+        -- of the frontend (where it would be most appropriate) is because of a
+        -- bug in obelisk missing exe-config (we need routeEnv) in the frontend
+        -- post hydration.
+        Left $ mkSlackLoginLink cfg $ Just $ renderFrontendRoute (_backendConfig_enc cfg) r
+      Just (_, v) ->
+        Right $ decode v
+  
 -- FIXME: Why is this a Maybe?
 setSlackTokenToCookie :: MonadSnap m => BackendConfig -> Maybe SlackTokenResponse -> m ()
 setSlackTokenToCookie cfg = setAuthToken (_backendConfig_sessKey cfg) . encode

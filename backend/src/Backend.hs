@@ -46,8 +46,8 @@ import Obelisk.Route hiding (decode, encode)
 import Common.Route
 import Common.Slack.Types
 
-import Backend.Login
 import Backend.Config
+import Backend.Login
 
 data Query
   = Query_Day Day

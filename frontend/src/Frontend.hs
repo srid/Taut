@@ -12,6 +12,8 @@ module Frontend where
 import Control.Monad
 import Data.Bool (bool)
 import Data.Foldable (foldl')
+import Data.Functor.Identity
+import Data.Functor.Sum
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe, isJust)
 import Data.Semigroup ((<>))
@@ -81,7 +83,7 @@ frontend = Frontend
               elClass "h1" "ui header" $ do
                 text "Messages matching: "
                 dynText $ paginatedRouteValue <$> r
-              resp <- getMessages r urlForBackendSearchMessages
+              resp <- getMessages r $ renderBackendRoute enc . (BackendRoute_SearchMessages :/)
               widgetHold_ (divClass "ui loading segment" blank) $ ffor resp $ \case
                 Nothing -> text "Something went wrong"
                 Just (Left grantHref) -> el "div" $ do
@@ -98,7 +100,7 @@ frontend = Frontend
               elClass "h1" "ui header" $ do
                 text "Archive for "
                 dynText $ showDay <$> day
-              resp <- getMessages r urlForBackendGetMessages
+              resp <- getMessages r $ renderBackendRoute enc . (BackendRoute_GetMessages :/)
               widgetHold_ (divClass "ui loading segment" blank) $ ffor resp $ \case
                 Nothing -> text "Something went wrong"
                 Just (Left grantHref) -> el "div" $ do
@@ -118,10 +120,7 @@ frontend = Frontend
   where
     -- TODO: This should point to the very first day in the archives.
     sampleMsgR = (Route_Messages :/ mkPaginatedRouteAtPage1 (fromGregorian 2019 3 27))
-    -- FIXME: refactor after https://github.com/obsidiansystems/obelisk/pull/286#issuecomment-489265962
-    urlForBackendGetMessages pd = "/" <> T.intercalate "/" (["get-messages"] <> encodeDay (paginatedRouteValue pd)) <> "?page" <> (("=" <>) $ T.pack $ show $ paginatedRoutePageIndex pd)
-    urlForBackendSearchMessages pr = "/search-messages/" <> paginatedRouteValue pr <> "?page" <> (("=" <>) $ T.pack $ show $ paginatedRoutePageIndex pr)
-
+    Right (enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute Route))) PageName) = checkEncoder backendRouteEncoder
 
     renderMessagesWithPagination r mkR (us, pm) = do
       let pgnW = dyn_ $ ffor r $ \pr ->
