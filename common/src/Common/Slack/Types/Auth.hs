@@ -33,6 +33,11 @@ data SlackTeam = SlackTeam
   }
   deriving (Eq, Show, Generic)
 
+data NotAuthorized
+  = NotAuthorized_RequireLogin Text
+  | NotAuthorized_WrongTeam SlackTeam Text
+  deriving (Eq, Show, Generic)
+
 -- | Slack's OAuth JSON field label modifier
 fieldLabelMod :: Options
 fieldLabelMod = defaultOptions
@@ -46,10 +51,14 @@ instance FromJSON SlackUser where
   parseJSON = genericParseJSON fieldLabelMod
 instance FromJSON SlackTeam where
   parseJSON = genericParseJSON fieldLabelMod
+instance FromJSON NotAuthorized where
+  parseJSON = genericParseJSON fieldLabelMod
 
 instance ToJSON SlackTokenResponse where
   toJSON = genericToJSON fieldLabelMod
 instance ToJSON SlackTeam where
   toJSON = genericToJSON fieldLabelMod
 instance ToJSON SlackUser where
+  toJSON = genericToJSON fieldLabelMod
+instance ToJSON NotAuthorized where
   toJSON = genericToJSON fieldLabelMod

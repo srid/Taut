@@ -30,8 +30,8 @@ import Backend.Config
 
 allowAnonymousOnLocalhost
   :: BackendConfig
-  -> Either Text (Maybe SlackTokenResponse)
-  -> Either Text (Maybe SlackTokenResponse)
+  -> Either NotAuthorized (Maybe SlackTokenResponse)
+  -> Either NotAuthorized (Maybe SlackTokenResponse)
 allowAnonymousOnLocalhost cfg = if T.isPrefixOf "http://localhost:" (_backendConfig_routeEnv cfg)
   then Right . either (const $ Just aWithLocal) id
   else id
@@ -44,13 +44,14 @@ allowAnonymousOnLocalhost cfg = if T.isPrefixOf "http://localhost:" (_backendCon
       , _slackTokenResponse_team = SlackTeam "T11111111"
       }
 
-getSlackTokenFromCookie
+authorizeUser
   :: MonadSnap m
   => BackendConfig
   -> R Route  -- ^ The route to redirect after signing in to Slack
-  -> m (Either Text (Maybe SlackTokenResponse))
-getSlackTokenFromCookie cfg r =
-  rmap (allowAnonymousOnLocalhost cfg) f <$> getAuthToken (_backendConfig_sessKey cfg)
+  -> m (Either NotAuthorized (Maybe SlackTokenResponse))
+authorizeUser cfg r = do
+  tok <- getAuthToken (_backendConfig_sessKey cfg)
+  pure $ rmap (allowAnonymousOnLocalhost cfg) f tok
   where
     f = \case
       Nothing ->
@@ -58,7 +59,8 @@ getSlackTokenFromCookie cfg r =
         -- of the frontend (where it would be most appropriate) is because of a
         -- bug in obelisk missing exe-config (we need routeEnv) in the frontend
         -- post hydration.
-        Left $ mkSlackLoginLink cfg $ Just $ renderFrontendRoute (_backendConfig_enc cfg) r
+        Left $ NotAuthorized_RequireLogin $
+          mkSlackLoginLink cfg $ Just $ renderFrontendRoute (_backendConfig_enc cfg) r
       Just (_, v) ->
         Right $ decode v
   

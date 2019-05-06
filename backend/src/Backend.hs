@@ -18,7 +18,7 @@ import Data.Aeson
 import qualified Data.ByteString.Lazy as BL
 import Data.List (isSuffixOf)
 import Data.List.Split (chunksOf)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, listToMaybe)
 import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -45,6 +45,7 @@ import Obelisk.Route hiding (decode, encode)
 
 import Common.Route
 import Common.Slack.Types
+import Common.Slack.Types.Auth (SlackTeam(..))
 
 import Backend.Config
 import Backend.Login
@@ -74,10 +75,10 @@ backend :: Backend BackendRoute Route
 backend = Backend
   { _backend_routeEncoder = backendRouteEncoder
   , _backend_run = \serve -> do
-      cfg <- readBackendConfig
+      team <- liftIO populateDatabase
+      cfg <- readBackendConfig team
+      liftIO $ T.putStrLn $ "teamID: " <> T.pack (show $ _backendConfig_team cfg)
       liftIO $ T.putStrLn $ "routeEnv: " <> _backendConfig_routeEnv cfg
-
-      liftIO populateDatabase
 
       serve $ \case
         BackendRoute_Missing :/ () -> do
@@ -105,7 +106,7 @@ backend = Backend
             redirect $ T.encodeUtf8 $ fromMaybe (renderFrontendRoute (_backendConfig_enc cfg) $ Route_Home :/ ()) mstate
         BackendRoute_GetMessages :/ pDay -> do
           -- TODO: Use MonadError wherever possible
-          resp <- getSlackTokenFromCookie cfg (Route_Messages :/ pDay) >>= \case
+          resp <- authorizeUser cfg (Route_Messages :/ pDay) >>= \case
             Left e -> pure $ Left e
             Right t -> do
               pagination <- liftIO $ mkPaginationFromRoute cfg pDay
@@ -113,7 +114,7 @@ backend = Backend
               pure $ Right (t, resp)
           writeLBS $ encode resp
         BackendRoute_SearchMessages :/ pQuery -> do
-          resp <- getSlackTokenFromCookie cfg (Route_Search :/ pQuery) >>= \case
+          resp <- authorizeUser cfg (Route_Search :/ pQuery) >>= \case
             Left e -> pure $ Left e
             Right t -> do
               pagination <- liftIO $ mkPaginationFromRoute cfg pQuery
@@ -179,10 +180,11 @@ schema =
   , "CREATE TABLE messages (id INTEGER PRIMARY KEY, type VARCHAR NOT NULL, subtype VARCHAR, user VARCHAR, bot_id VARCHAR, text VARCHAR NOT NULL, client_msg_id VARCHAR, ts INT NOT NULL, channel_name VARCHAR);"
   ]
 
-populateDatabase :: IO ()
+populateDatabase :: IO SlackTeam
 populateDatabase = do
   users <- loadFile $ rootDir </> "users.json" :: IO [User]
   channels <- loadFile $ rootDir </> "channels.json" :: IO [Channel]
+  let Just (team :: SlackTeam) = fmap SlackTeam $ listToMaybe $ _userTeamId <$> users
 
   messages <- fmap join $ traverse channelMessages channels
 
@@ -206,6 +208,7 @@ populateDatabase = do
           runInsert $
             insert (_slackMessages slackDb) $
             insertExpressions (mkMessageExpr <$> chunk)
+  pure team
   where
     mkMessageExpr :: Message -> MessageT (QExpr Sqlite s)
     mkMessageExpr m = Message

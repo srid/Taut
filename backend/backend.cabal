@@ -32,6 +32,7 @@ library
                , dependent-sum
                , dependent-sum-template
                , safe-exceptions
+               , profunctors
                , mmark
                , modern-uri
                , pagination
@@ -54,6 +55,7 @@ executable backend
   build-depends: base
                , backend
                , aeson
+               , profunctors
                , split
                , common
                , frontend

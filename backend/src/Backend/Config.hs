@@ -22,11 +22,13 @@ import Obelisk.Route hiding (decode, encode)
 import qualified Obelisk.ExecutableConfig as Cfg
 
 import Common.Route
+import Common.Slack.Types.Auth (SlackTeam(..))
 
 data BackendConfig = BackendConfig
   { _backendConfig_enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute Route))) PageName
   , _backendConfig_sessKey :: Key
   , _backendConfig_tlsMgr :: Manager
+  , _backendConfig_team :: SlackTeam
   , _backendConfig_pageSize :: Natural
   , _backendConfig_routeEnv :: Text
   , _backendConfig_oauthClientID :: Text  -- TODO: invariant for oauth format?
@@ -40,10 +42,11 @@ data InvalidConfig
 
 instance Exception InvalidConfig
 
-readBackendConfig :: IO BackendConfig
-readBackendConfig = BackendConfig enc
+readBackendConfig :: SlackTeam -> IO BackendConfig
+readBackendConfig team = BackendConfig enc
   <$> (snd <$> randomKey)
   <*> newTlsManager
+  <*> pure team
   <*> pure defaultPageSize
   <*> getConfigNonEmpty "config/common/route"
   <*> getConfigNonEmpty "config/backend/oauthClientID"

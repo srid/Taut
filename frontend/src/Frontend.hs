@@ -86,10 +86,7 @@ frontend = Frontend
               resp <- getMessages r $ renderBackendRoute enc . (BackendRoute_SearchMessages :/)
               widgetHold_ (divClass "ui loading segment" blank) $ ffor resp $ \case
                 Nothing -> text "Something went wrong"
-                Just (Left grantHref) -> el "div" $ do
-                  el "div" $ text "Not Authorized"
-                  elAttr "a" ("href" =: grantHref) $
-                    elAttr "img" ("src" =: "https://api.slack.com/img/sign_in_with_slack.png") blank
+                Just (Left na) -> notAuthorizedWidget na
                 Just (Right (t, v)) -> do
                   divClass "ui segment" $ text $ T.pack $ show t
                   renderMessagesWithPagination r Route_Search v
@@ -103,10 +100,7 @@ frontend = Frontend
               resp <- getMessages r $ renderBackendRoute enc . (BackendRoute_GetMessages :/)
               widgetHold_ (divClass "ui loading segment" blank) $ ffor resp $ \case
                 Nothing -> text "Something went wrong"
-                Just (Left grantHref) -> el "div" $ do
-                  el "div" $ text "Not Authorized"
-                  elAttr "a" ("href" =: grantHref) $
-                    elAttr "img" ("src" =: "https://api.slack.com/img/sign_in_with_slack.png") blank
+                Just (Left na) -> notAuthorizedWidget na
                 Just (Right (t, v)) -> do
                   divClass "ui segment" $ text $ T.pack $ show t
                   dyn_ $ ffor day $ \d -> do
@@ -122,6 +116,18 @@ frontend = Frontend
     sampleMsgR = (Route_Messages :/ mkPaginatedRouteAtPage1 (fromGregorian 2019 3 27))
     Right (enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute Route))) PageName) = checkEncoder backendRouteEncoder
 
+    notAuthorizedWidget :: DomBuilder t m => NotAuthorized -> m ()
+    notAuthorizedWidget = \case
+      NotAuthorized_RequireLogin grantHref -> divClass "ui segment" $ do
+        el "p" $ text "You must login to Slack to access this page."
+        slackLoginButton grantHref
+      NotAuthorized_WrongTeam (SlackTeam teamId) grantHref -> divClass "ui segment" $ do
+        el "p" $ text $ "Your team " <> teamId <> " does not match that of the archives. Please login to the correct team."
+        slackLoginButton grantHref
+      where
+        slackLoginButton r = elAttr "a" ("href" =: r) $
+          elAttr "img" ("src" =: "https://api.slack.com/img/sign_in_with_slack.png") blank
+
     renderMessagesWithPagination r mkR (us, pm) = do
       let pgnW = dyn_ $ ffor r $ \pr ->
             paginationNav pm $ \p' -> mkR :/ (PaginatedRoute (p', paginatedRouteValue pr))
@@ -131,7 +137,7 @@ frontend = Frontend
       :: (Reflex t, MonadHold t m, PostBuild t m, DomBuilder t m, Prerender js t m)
       => Dynamic t r
       -> (r -> Text)
-      -> m (Event t (Maybe (Either Text (SlackTokenResponse, ([User], Paginated Message)))))
+      -> m (Event t (Maybe (Either NotAuthorized (SlackTokenResponse, ([User], Paginated Message)))))
     getMessages r mkUrl = switchHold never <=< dyn $ ffor r $ \x -> do
       fmap switchDyn $ prerender (pure never) $ do
         pb <- getPostBuild
