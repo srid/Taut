@@ -1,0 +1,64 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
+-- Slack login and how we use that to authorize users
+module Backend.Login where
+
+import Data.Aeson
+import Data.Maybe (catMaybes, listToMaybe)
+import Control.Monad
+import Data.Text (Text)
+import qualified Data.ByteString.Lazy as BL
+
+import Snap
+import Snap.Snaplet.Session
+import Web.ClientSession
+
+import Obelisk.OAuth.Authorization
+
+import Common.Slack.Types.Auth
+
+import Backend.Config
+
+getSlackTokenFromCookie :: MonadSnap m => BackendConfig -> m (Either Text (Maybe SlackTokenResponse))
+getSlackTokenFromCookie cfg = getAuthToken (_backendConfig_sessKey cfg) >>= \case
+  Nothing ->
+    -- NOTE: The oreason we build the grantHref in the backend instead
+    -- of the frontend (where it would be most appropriate) is because of a
+    -- bug in obelisk missing exe-config (we need routeEnv) in the frontend
+    -- post hydration.
+    pure $ Left $ mkSlackLoginLink cfg
+  Just (_, v) ->
+    pure $ Right $ decode v
+-- FIXME: Why is this a Maybe?
+setSlackTokenToCookie :: MonadSnap m => BackendConfig -> Maybe SlackTokenResponse -> m ()
+setSlackTokenToCookie cfg = setAuthToken (_backendConfig_sessKey cfg) . encode
+mkSlackLoginLink :: BackendConfig -> Text
+mkSlackLoginLink cfg = authorizationRequestHref authUrl routeEnv enc r
+  where
+    r = AuthorizationRequest
+        { _authorizationRequest_responseType = AuthorizationResponseType_Code
+        , _authorizationRequest_clientId = _backendConfig_oauthClientID cfg
+        , _authorizationRequest_redirectUri = Nothing -- Just BackendRoute_OAuth
+        , _authorizationRequest_scope = ["identity.basic"]
+        , _authorizationRequest_state = Just "none"
+        }
+    authUrl = "https://slack.com/oauth/authorize"
+    routeEnv = _backendConfig_routeEnv cfg
+    enc = _backendConfig_enc cfg
+
+getAuthToken :: MonadSnap m => Key -> m (Maybe (SecureCookie BL.ByteString))
+getAuthToken k = do
+  c <- getsRequest rqCookies
+  fmap (join . listToMaybe . catMaybes) $ forM c $ \cc->
+    if cookieName cc == "tautAuthToken"
+        then let x :: Maybe (SecureCookie BL.ByteString) = decodeSecureCookie @BL.ByteString k (cookieValue cc)
+             in pure $ Just x
+        else pure Nothing
+
+setAuthToken :: MonadSnap m => Key -> BL.ByteString -> m ()
+setAuthToken k t = setSecureCookie "tautAuthToken" Nothing k Nothing (t :: BL.ByteString)

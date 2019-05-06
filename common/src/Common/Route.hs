@@ -49,7 +49,7 @@ data BackendRoute :: * -> * where
   BackendRoute_GetMessages :: BackendRoute (PaginatedRoute Day)
   BackendRoute_SearchMessages :: BackendRoute (PaginatedRoute Text)
 
--- Rename to Frontend Route
+-- TODO: Rename to Frontend Route
 data Route :: * -> * where
   Route_Home :: Route ()
   Route_Messages :: Route (PaginatedRoute Day)

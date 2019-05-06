@@ -42,6 +42,8 @@ library
                , snap
   exposed-modules:
     Backend
+    Backend.Config
+    Backend.Login
   ghc-options: -Wall
 
 executable backend
