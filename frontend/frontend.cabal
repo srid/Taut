@@ -13,6 +13,8 @@ library
                , string-conv
                , obelisk-route
                , obelisk-frontend
+               , obelisk-oauth-common
+               , obelisk-executable-config
                , obelisk-generated-static
                , clay
                , containers
@@ -39,6 +41,8 @@ executable frontend
                , string-conv
                , obelisk-route
                , obelisk-frontend
+               , obelisk-oauth-common
+               , obelisk-executable-config
                , obelisk-generated-static
                , clay
                , containers

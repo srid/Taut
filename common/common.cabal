@@ -29,5 +29,6 @@ library
   exposed-modules:
     Common.Route
     Common.Slack.Types
+    Common.Slack.Types.Auth
     Common.Slack.Internal
   ghc-options: -Wall

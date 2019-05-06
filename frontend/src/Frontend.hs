@@ -28,11 +28,13 @@ import Obelisk.Route.Frontend
 
 import Common.Route
 import Common.Slack.Types
+import Common.Slack.Types.Auth
 import Obelisk.Generated.Static
 
 import Data.Pagination
 
 import Frontend.Util
+
 
 frontend :: Frontend (R Route)
 frontend = Frontend
@@ -69,7 +71,6 @@ frontend = Frontend
                     searchInputWidgetWithRoute query $ \q' -> Route_Search :/ (PaginatedRoute (1, q'))
               )
             ]
-
           divClass "ui segment" $ subRoute_ $ \case
             Route_Home -> el "p" $ do
               text "Welcome to Taut, the Slack archive viewer. This app is a work in progress. Meanwhile, "
@@ -80,8 +81,16 @@ frontend = Frontend
               elClass "h1" "ui header" $ do
                 text "Messages matching: "
                 dynText $ paginatedRouteValue <$> r
-              msgsE <- getMessages r urlForBackendSearchMessages
-              renderMessagesWithPagination r Route_Search msgsE
+              resp <- getMessages r urlForBackendSearchMessages
+              widgetHold_ (divClass "ui loading segment" blank) $ ffor resp $ \case
+                Nothing -> text "Something went wrong"
+                Just (Left grantHref) -> el "div" $ do
+                  el "div" $ text "Not Authorized"
+                  elAttr "a" ("href" =: grantHref) $
+                    elAttr "img" ("src" =: "https://api.slack.com/img/sign_in_with_slack.png") blank
+                Just (Right (t, v)) -> do
+                  divClass "ui segment" $ text $ T.pack $ show t
+                  renderMessagesWithPagination r Route_Search v
             Route_Messages -> do
               -- TODO: this is also paginated
               r :: Dynamic t (PaginatedRoute Day) <- askRoute
@@ -89,12 +98,20 @@ frontend = Frontend
               elClass "h1" "ui header" $ do
                 text "Archive for "
                 dynText $ showDay <$> day
-              dyn_ $ ffor day $ \d -> do
-                routeLink (Route_Messages :/ mkPaginatedRouteAtPage1 (addDays (-1) d)) $ elClass "button" "ui button" $ text "Prev Day"
-              dyn_ $ ffor day $ \d -> do
-                routeLink (Route_Messages :/ mkPaginatedRouteAtPage1 (addDays 1 d)) $ elClass "button" "ui button" $ text "Next Day"
-              msgsE <- getMessages r urlForBackendGetMessages
-              renderMessagesWithPagination r Route_Messages msgsE
+              resp <- getMessages r urlForBackendGetMessages
+              widgetHold_ (divClass "ui loading segment" blank) $ ffor resp $ \case
+                Nothing -> text "Something went wrong"
+                Just (Left grantHref) -> el "div" $ do
+                  el "div" $ text "Not Authorized"
+                  elAttr "a" ("href" =: grantHref) $
+                    elAttr "img" ("src" =: "https://api.slack.com/img/sign_in_with_slack.png") blank
+                Just (Right (t, v)) -> do
+                  divClass "ui segment" $ text $ T.pack $ show t
+                  dyn_ $ ffor day $ \d -> do
+                    routeLink (Route_Messages :/ mkPaginatedRouteAtPage1 (addDays (-1) d)) $ elClass "button" "ui button" $ text "Prev Day"
+                  dyn_ $ ffor day $ \d -> do
+                    routeLink (Route_Messages :/ mkPaginatedRouteAtPage1 (addDays 1 d)) $ elClass "button" "ui button" $ text "Next Day"
+                  renderMessagesWithPagination r Route_Messages v
           divClass "ui bottom attached secondary segment" $ do
             elAttr "a" ("href" =: "https://github.com/srid/Taut") $ text "Powered by Haskell"
   }
@@ -105,33 +122,28 @@ frontend = Frontend
     urlForBackendGetMessages pd = "/" <> T.intercalate "/" (["get-messages"] <> encodeDay (paginatedRouteValue pd)) <> "?page" <> (("=" <>) $ T.pack $ show $ paginatedRoutePageIndex pd)
     urlForBackendSearchMessages pr = "/search-messages/" <> paginatedRouteValue pr <> "?page" <> (("=" <>) $ T.pack $ show $ paginatedRoutePageIndex pr)
 
-    renderMessagesWithPagination r mkR msgsE = do
-      let pgn = attachWithMaybe
-                (\pr mm -> (\(_, pm) -> (paginatedRouteValue pr, pm)) <$> mm)
-                (current r) msgsE
-      let pgnW = widgetHold_ blank $ ffor pgn $ \(q, pm) ->
-            paginationNav pm $ \p' -> mkR :/ (PaginatedRoute (p', q))
-      pgnW >> renderMessages msgsE >> pgnW
+
+    renderMessagesWithPagination r mkR (us, pm) = do
+      let pgnW = dyn_ $ ffor r $ \pr ->
+            paginationNav pm $ \p' -> mkR :/ (PaginatedRoute (p', paginatedRouteValue pr))
+      pgnW >> renderMessages (us, pm) >> pgnW
 
     getMessages
       :: (Reflex t, MonadHold t m, PostBuild t m, DomBuilder t m, Prerender js t m)
       => Dynamic t r
       -> (r -> Text)
-      -> m (Event t (Maybe ([User], Paginated Message)))
+      -> m (Event t (Maybe (Either Text (SlackTokenResponse, ([User], Paginated Message)))))
     getMessages r mkUrl = switchHold never <=< dyn $ ffor r $ \x -> do
       fmap switchDyn $ prerender (pure never) $ do
         pb <- getPostBuild
         getAndDecode $ mkUrl x <$ pb
-    renderMessages msgsE =
-      widgetHold_ (divClass "ui loading segment" blank) $ ffor msgsE $ divClass "ui segment" . \case
-        Nothing -> text "Something went wrong"
-        Just (users', pm)
-          | msgs == [] -> text "No results"
-          | otherwise -> divClass "ui comments" $ do
-              let users = Map.fromList $ ffor users' $ \u -> (_userId u, _userName u)
-              forM_ (filter (isJust . _messageChannelName) msgs) $ singleMessage users
-          where
-            msgs = paginatedItems pm
+    renderMessages (users', pm)
+      | msgs == [] = text "No results"
+      | otherwise = divClass "ui comments" $ do
+          let users = Map.fromList $ ffor users' $ \u -> (_userId u, _userName u)
+          forM_ (filter (isJust . _messageChannelName) msgs) $ singleMessage users
+      where
+        msgs = paginatedItems pm
     showDay day = T.pack $ printf "%d-%02d-%02d" y m d
       where
         (y, m, d) = toGregorian day

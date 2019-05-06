@@ -5,3 +5,5 @@ result-ios
 .attr-cache
 ghcid-output.txt
 tmp
+result-*
+deploy

@@ -22,6 +22,11 @@ library
                , split
                , text
                , time
+               , http-client
+               , http-client-tls
+               , clientsession
+               , obelisk-route
+               , obelisk-executable-config
                , reflex-dom-core
                , obelisk-backend
                , dependent-sum
@@ -60,6 +65,11 @@ executable backend
                , obelisk-backend
                , obelisk-executable-config
                , obelisk-executable-config-inject
+               , http-client
+               , http-client-tls
+               , clientsession
+               , obelisk-route
+               , obelisk-executable-config
                , text
                , time
                , reflex-dom-core
