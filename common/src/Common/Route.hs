@@ -48,14 +48,13 @@ data BackendRoute :: * -> * where
   BackendRoute_GetMessages :: BackendRoute (PaginatedRoute Day)
   BackendRoute_SearchMessages :: BackendRoute (PaginatedRoute Text)
 
--- TODO: Rename to Frontend Route
-data Route :: * -> * where
-  Route_Home :: Route ()
-  Route_Messages :: Route (PaginatedRoute Day)
-  Route_Search :: Route (PaginatedRoute Text)
+data FrontendRoute :: * -> * where
+  FrontendRoute_Home :: FrontendRoute ()
+  FrontendRoute_Messages :: FrontendRoute (PaginatedRoute Day)
+  FrontendRoute_Search :: FrontendRoute (PaginatedRoute Text)
 
 backendRouteEncoder
-  :: Encoder (Either Text) Identity (R (Sum BackendRoute (ObeliskRoute Route))) PageName
+  :: Encoder (Either Text) Identity (R (Sum BackendRoute (ObeliskRoute FrontendRoute))) PageName
 backendRouteEncoder = handleEncoder (const (InL BackendRoute_Missing :/ ())) $
   pathComponentEncoder $ \case
     InL backendRoute -> case backendRoute of
@@ -68,10 +67,10 @@ backendRouteEncoder = handleEncoder (const (InL BackendRoute_Missing :/ ())) $
     InR obeliskRoute -> obeliskRouteSegment obeliskRoute $ \case
       -- The encoder given to PathEnd determines how to parse query parameters,
       -- in this example, we have none, so we insist on it.
-      Route_Home -> PathEnd $ unitEncoder mempty
-      Route_Messages -> PathSegment "messages" $
+      FrontendRoute_Home -> PathEnd $ unitEncoder mempty
+      FrontendRoute_Messages -> PathSegment "messages" $
         paginatedEncoder dayEncoderImpl
-      Route_Search -> PathSegment "search" $
+      FrontendRoute_Search -> PathSegment "search" $
         paginatedEncoder textEncoderImpl
 
 paginatedEncoder
@@ -130,6 +129,6 @@ encodeDay day = [T.pack $ show y, T.pack $ show m, T.pack $ show d]
 
 
 concat <$> mapM deriveRouteComponent
-  [ ''Route
+  [ ''FrontendRoute
   , ''BackendRoute
   ]

@@ -42,7 +42,7 @@ import Backend.Config
 authorizeUser
   :: MonadSnap m
   => BackendConfig
-  -> R Route  -- ^ The route to redirect after signing in to Slack
+  -> R FrontendRoute  -- ^ The route to redirect after signing in to Slack
   -> m (Either NotAuthorized SlackUser)
 authorizeUser cfg r = do
   tok <- getAuthToken (_backendConfig_sessKey cfg)

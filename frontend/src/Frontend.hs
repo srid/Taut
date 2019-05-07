@@ -32,7 +32,7 @@ import Frontend.Message
 import Frontend.Util
 
 
-frontend :: Frontend (R Route)
+frontend :: Frontend (R FrontendRoute)
 frontend = Frontend
   { _frontend_head = do
       elAttr "base" ("href" =: "/") blank
@@ -51,29 +51,30 @@ frontend = Frontend
         divClass "ui attached segment" $ mdo
           let itemClass active = bool "item" "active item" <$> active
           divClass "ui pointing inverted menu" $ subRouteMenu
-            [ ( This Route_Home
-              , \isActive -> routeLinkClass (Route_Home :/ ()) (itemClass isActive) $ text "Home"
+            [ ( This FrontendRoute_Home
+              , \isActive -> routeLinkClass (FrontendRoute_Home :/ ()) (itemClass isActive) $ text "Home"
               )
-            , ( This Route_Messages
+            , ( This FrontendRoute_Messages
               , \isActive -> routeLinkClass sampleMsgR (itemClass isActive) $ text "Archive"
               )
-            , ( This Route_Search
+            , ( This FrontendRoute_Search
               , \isActive -> divClass "right menu" $ do
                   widgetHold_ blank $ ffor userE $ \(SlackUser name _) ->
                     divClass "item" $ text $ "Welcome " <> name
                   elDynClass "div" (itemClass isActive) $ do
                     -- FIXME: On hard page refresh the query is not being set as initial value in input.
                     query <- fmap join $ subRoute $ \case
-                      Route_Search -> fmap paginatedRouteValue <$> askRoute
+                      FrontendRoute_Search -> fmap paginatedRouteValue <$> askRoute
                       _ -> pure $ constDyn ""
-                    searchInputWidgetWithRoute query $ \q' -> Route_Search :/ (PaginatedRoute (1, q'))
+                    searchInputWidgetWithRoute query $ \q' ->
+                      FrontendRoute_Search :/ (PaginatedRoute (1, q'))
               )
             ]
           userE :: Event t SlackUser <- divClass "ui segment" $ fmap switchDyn $ subRoute $ \case
-            Route_Home -> el "p" $ do
+            FrontendRoute_Home -> el "p" $ do
               text "Welcome to Taut, the Slack archive viewer. Click 'Archive' or do a search."
               pure never
-            Route_Search -> do
+            FrontendRoute_Search -> do
               r  :: Dynamic t (PaginatedRoute Text) <- askRoute
               elClass "h1" "ui header" $ do
                 text "Messages matching: "
@@ -83,9 +84,9 @@ frontend = Frontend
                 Nothing -> text "Something went wrong"
                 Just (Left na) -> notAuthorizedWidget na
                 Just (Right (_, v)) -> do
-                  renderMessagesWithPagination r Route_Search v
+                  renderMessagesWithPagination r FrontendRoute_Search v
               pure $ fmap fst $ filterRight $ fforMaybe resp id
-            Route_Messages -> do
+            FrontendRoute_Messages -> do
               r :: Dynamic t (PaginatedRoute Day) <- askRoute
               let day = paginatedRouteValue <$> r
               elClass "h1" "ui header" $ do
@@ -97,17 +98,17 @@ frontend = Frontend
                 Just (Left na) -> notAuthorizedWidget na
                 Just (Right (_, v)) -> do
                   dyn_ $ ffor day $ \d -> do
-                    routeLink (Route_Messages :/ mkPaginatedRouteAtPage1 (addDays (-1) d)) $ elClass "button" "ui button" $ text "Prev Day"
+                    routeLink (FrontendRoute_Messages :/ mkPaginatedRouteAtPage1 (addDays (-1) d)) $ elClass "button" "ui button" $ text "Prev Day"
                   dyn_ $ ffor day $ \d -> do
-                    routeLink (Route_Messages :/ mkPaginatedRouteAtPage1 (addDays 1 d)) $ elClass "button" "ui button" $ text "Next Day"
-                  renderMessagesWithPagination r Route_Messages v
+                    routeLink (FrontendRoute_Messages :/ mkPaginatedRouteAtPage1 (addDays 1 d)) $ elClass "button" "ui button" $ text "Next Day"
+                  renderMessagesWithPagination r FrontendRoute_Messages v
               pure $ fmap fst $ filterRight $ fforMaybe resp id
           divClass "ui bottom attached secondary segment" $ do
             elAttr "a" ("href" =: "https://github.com/srid/Taut") $ text "Powered by Haskell"
   }
   where
     -- TODO: This should point to the very first day in the archives.
-    sampleMsgR = (Route_Messages :/ mkPaginatedRouteAtPage1 (fromGregorian 2019 3 27))
+    sampleMsgR = FrontendRoute_Messages :/ mkPaginatedRouteAtPage1 (fromGregorian 2019 3 27)
 
     notAuthorizedWidget :: DomBuilder t m => NotAuthorized -> m ()
     notAuthorizedWidget = \case

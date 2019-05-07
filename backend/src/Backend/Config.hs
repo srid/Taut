@@ -25,7 +25,7 @@ import Common.Route
 import Common.Slack.Types.Auth (SlackTeam(..))
 
 data BackendConfig = BackendConfig
-  { _backendConfig_enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute Route))) PageName
+  { _backendConfig_enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute FrontendRoute))) PageName
   , _backendConfig_sessKey :: Key
   , _backendConfig_tlsMgr :: Manager
   , _backendConfig_team :: SlackTeam
@@ -52,7 +52,7 @@ readBackendConfig team = BackendConfig enc
   <*> getConfigNonEmpty "config/backend/oauthClientID"
   <*> getConfigNonEmpty "config/backend/oauthClientSecret"
   where
-    Right (enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute Route))) PageName) = checkEncoder backendRouteEncoder
+    Right (enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute FrontendRoute))) PageName) = checkEncoder backendRouteEncoder
     defaultPageSize = 50
     getConfigNonEmpty p = Cfg.get p >>= \case
       Nothing -> throwIO $ InvalidConfig_Missing p

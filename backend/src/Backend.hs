@@ -36,7 +36,7 @@ import Backend.Login
 import Backend.Query
 
 
-backend :: Backend BackendRoute Route
+backend :: Backend BackendRoute FrontendRoute
 backend = Backend
   { _backend_routeEncoder = backendRouteEncoder
   , _backend_run = \serve -> do
@@ -51,10 +51,10 @@ backend = Backend
           Nothing -> liftIO $ throwString "Expected to receive the authorization code here"
           Just (RedirectUriParams code mstate) -> do
             handleOAuthCallback cfg code
-            redirect $ T.encodeUtf8 $ fromMaybe (renderFrontendRoute (_backendConfig_enc cfg) $ Route_Home :/ ()) mstate
+            redirect $ T.encodeUtf8 $ fromMaybe (renderFrontendRoute (_backendConfig_enc cfg) $ FrontendRoute_Home :/ ()) mstate
         BackendRoute_GetMessages :/ pDay -> do
           -- TODO: Use MonadError wherever possible
-          resp :: MessagesResponse <- authorizeUser cfg (Route_Messages :/ pDay) >>= \case
+          resp :: MessagesResponse <- authorizeUser cfg (FrontendRoute_Messages :/ pDay) >>= \case
             Left e -> pure $ Left e
             Right t -> do
               pagination <- liftIO $ mkPaginationFromRoute cfg pDay
@@ -62,7 +62,7 @@ backend = Backend
               pure $ Right (t, resp)
           writeLBS $ encode resp
         BackendRoute_SearchMessages :/ pQuery -> do
-          resp :: MessagesResponse <- authorizeUser cfg (Route_Search :/ pQuery) >>= \case
+          resp :: MessagesResponse <- authorizeUser cfg (FrontendRoute_Search :/ pQuery) >>= \case
             Left e -> pure $ Left e
             Right t -> do
               pagination <- liftIO $ mkPaginationFromRoute cfg pQuery

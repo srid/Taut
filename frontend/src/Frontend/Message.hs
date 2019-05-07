@@ -27,8 +27,8 @@ import Common.Types
 
 messageList
   :: ( DomBuilder t m
-     , SetRoute t (R Route) m
-     , RouteToUrl (R Route) m
+     , SetRoute t (R FrontendRoute) m
+     , RouteToUrl (R FrontendRoute) m
      )
   => ([User], Paginated Message) -> m ()
 messageList (users', pm)
@@ -41,8 +41,8 @@ messageList (users', pm)
 
 singleMessage
   :: ( DomBuilder t m
-     , SetRoute t (R Route) m
-     , RouteToUrl (R Route) m
+     , SetRoute t (R FrontendRoute) m
+     , RouteToUrl (R FrontendRoute) m
      )
   => Map.Map Text Text -> Message -> m ()
 singleMessage users msg = do
@@ -51,7 +51,7 @@ singleMessage users msg = do
       elClass "a" "author" $ do
         text $ maybe "Nobody" (\u -> Map.findWithDefault "Unknown" u users) $ _messageUser msg
       let day = utctDay $ _messageTs msg
-          r = Route_Messages :/ mkPaginatedRouteAtPage1 day -- TODO: Determine page where message lies.
+          r = FrontendRoute_Messages :/ mkPaginatedRouteAtPage1 day -- TODO: Determine page where message lies.
       divClass "metadata" $ do
         divClass "room" $ text $ fromMaybe "Unknown Channel" $ fmap ("#" <>) $ _messageChannelName msg
         divClass "date" $ do
@@ -71,4 +71,4 @@ getMessages dr mkUrl = switchHold never <=< dyn $ ffor dr $ \r -> do
     pb <- getPostBuild
     getAndDecode $ (renderBackendRoute enc . mkUrl) r <$ pb
   where
-    Right (enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute Route))) PageName) = checkEncoder backendRouteEncoder
+    Right (enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute FrontendRoute))) PageName) = checkEncoder backendRouteEncoder
