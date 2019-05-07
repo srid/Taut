@@ -45,6 +45,8 @@ library
     Backend
     Backend.Config
     Backend.Login
+    Backend.Import
+    Backend.Query
   ghc-options: -Wall
 
 executable backend

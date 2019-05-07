@@ -9,21 +9,27 @@
 -- Slack login and how we use that to authorize users
 module Backend.Login
   ( authorizeUser
-  , setSlackTokenToCookie
+  , handleOAuthCallback
   ) where
 
+import Control.Exception.Safe (throwString)
 import Control.Monad
+import Control.Monad.IO.Class
 import Data.Aeson
 import qualified Data.ByteString.Lazy as BL
 import Data.Maybe (catMaybes, listToMaybe)
 import Data.Profunctor (rmap)
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
+import qualified Data.Text.IO as T
 
+import Network.HTTP.Client
 import Snap
 import Snap.Snaplet.Session
 import Web.ClientSession
 
+import Obelisk.OAuth.AccessToken
 import Obelisk.OAuth.Authorization
 import Obelisk.Route hiding (decode, encode)
 
@@ -85,6 +91,30 @@ mkSlackLoginLink cfg mstate = authorizationRequestHref authUrl routeEnv enc r
     authUrl = "https://slack.com/oauth/authorize"
     routeEnv = _backendConfig_routeEnv cfg
     enc = _backendConfig_enc cfg
+
+handleOAuthCallback :: MonadSnap m => BackendConfig -> Text -> m ()
+handleOAuthCallback cfg code = do
+  let t = TokenRequest
+        { _tokenRequest_grant = TokenGrant_AuthorizationCode $ T.encodeUtf8 code
+        , _tokenRequest_clientId = _backendConfig_oauthClientID cfg
+        , _tokenRequest_clientSecret = _backendConfig_oauthClientSecret cfg
+        , _tokenRequest_redirectUri = BackendRoute_OAuth
+        }
+      reqUrl = "https://slack.com/api/oauth.access"
+  req <- liftIO $ getOauthToken
+    reqUrl
+    (_backendConfig_routeEnv cfg)
+    (_backendConfig_enc cfg)
+    t
+  resp <- liftIO $ httpLbs req $ _backendConfig_tlsMgr cfg
+  -- TODO: check response errors (both code and body json)!
+  case decode (responseBody resp) of
+    Nothing -> do
+      -- TODO: When this throws {ok: false, error: ...} parse that properly
+      liftIO $ T.putStrLn $ T.decodeUtf8 $ BL.toStrict $ responseBody resp
+      liftIO $ throwString "Unable to decode JSON from Slack oauth.access response"
+    Just str -> do
+      setSlackTokenToCookie cfg str
 
 getAuthToken :: MonadSnap m => Key -> m (Maybe (SecureCookie BL.ByteString))
 getAuthToken k = do
