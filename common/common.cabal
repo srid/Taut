@@ -7,24 +7,24 @@ library
   hs-source-dirs: src
   build-depends: aeson
                , base
+               , beam-core
                , bytestring
+               , casing
                , containers
                , dependent-sum
                , dependent-sum-template
+               , filepath
+               , mtl
                , obelisk-oauth-common
                , obelisk-route
-               , mtl
                , pagination
+               , reflex
+               , template-haskell
                , text
                , these
-               , universe
-               , reflex
-               , filepath
-               , template-haskell
                , time
+               , universe
                , universe-template
-               , beam-core
-               , casing
 
   exposed-modules:
     Common.Route

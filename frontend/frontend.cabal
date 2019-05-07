@@ -6,24 +6,24 @@ build-type: Simple
 library
   hs-source-dirs: src
   build-depends: base
-               , common
-               , dependent-sum
-               , reflex-dom
-               , text
-               , string-conv
-               , obelisk-route
-               , obelisk-frontend
-               , obelisk-oauth-common
-               , obelisk-executable-config
-               , obelisk-generated-static
                , clay
+               , common
                , containers
-               , time
+               , dependent-sum
+               , jsaddle
                , lens
                , modern-uri
-               , pagination
-               , jsaddle
                , mtl
+               , obelisk-executable-config
+               , obelisk-frontend
+               , obelisk-generated-static
+               , obelisk-oauth-common
+               , obelisk-route
+               , pagination
+               , reflex-dom
+               , string-conv
+               , text
+               , time
   exposed-modules:
     Frontend
     Frontend.Util
@@ -33,25 +33,25 @@ executable frontend
   main-is: main.hs
   hs-source-dirs: src
   build-depends: base
-               , common
-               , dependent-sum
-               , reflex-dom
-               , text
-               , frontend
-               , string-conv
-               , obelisk-route
-               , obelisk-frontend
-               , obelisk-oauth-common
-               , obelisk-executable-config
-               , obelisk-generated-static
                , clay
+               , common
                , containers
-               , time
+               , dependent-sum
+               , frontend
+               , jsaddle
                , lens
                , modern-uri
-               , pagination
-               , jsaddle
                , mtl
+               , obelisk-executable-config
+               , obelisk-frontend
+               , obelisk-generated-static
+               , obelisk-oauth-common
+               , obelisk-route
+               , pagination
+               , reflex-dom
+               , string-conv
+               , text
+               , time
   --TODO: Make these ghc-options optional
   ghc-options: -threaded
   if os(darwin)
