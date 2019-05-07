@@ -33,9 +33,6 @@ import Common.Slack.Types.Auth (SlackTeam (..))
 rootDir :: String
 rootDir = "/home/srid/code/Taut/tmp"
 
-dbFile :: String
-dbFile = "taut-data.sqlite3"
-
 data SlackDb f = SlackDb
   { _slackChannels :: f (TableEntity ChannelT)
   , _slackUsers :: f (TableEntity UserT)
@@ -69,34 +66,31 @@ schema =
   , "CREATE TABLE messages (id INTEGER PRIMARY KEY, type VARCHAR NOT NULL, subtype VARCHAR, user VARCHAR, bot_id VARCHAR, text VARCHAR NOT NULL, client_msg_id VARCHAR, ts INT NOT NULL, channel_name VARCHAR);"
   ]
 
-populateDatabase :: IO SlackTeam
-populateDatabase = do
+populateDatabase :: SQLite.Connection -> IO SlackTeam
+populateDatabase conn = do
   users <- loadFile $ rootDir </> "users.json" :: IO [User]
   channels <- loadFile $ rootDir </> "channels.json" :: IO [Channel]
   let Just (team :: SlackTeam) = fmap SlackTeam $ listToMaybe $ _userTeamId <$> users
 
   messages <- fmap join $ traverse channelMessages channels
 
-  doesFileExist dbFile >>= flip when (removeFile dbFile)
+  putStrLn $ "Loading " <> show (length messages) <> " messages into memory "
 
-  putStrLn $ "Loading " <> show (length messages) <> " messages into " <> dbFile
-
-  SQLite.withConnection dbFile $ \conn -> do
-    SQLite.withTransaction conn $ do
-      -- Create tables
-      forM_ schema $ SQLite.execute_ conn
-      -- Load JSON data
-      runBeamSqlite conn $ do
+  SQLite.withTransaction conn $ do
+    -- Create tables
+    forM_ schema $ SQLite.execute_ conn
+    -- Load JSON data
+    runBeamSqlite conn $ do
+      runInsert $
+        insert (_slackUsers slackDb) $
+        insertValues users
+      runInsert $
+        insert (_slackChannels slackDb) $
+        insertValues channels
+      forM_ (chunksOf 100 messages) $ \chunk -> do
         runInsert $
-          insert (_slackUsers slackDb) $
-          insertValues users
-        runInsert $
-          insert (_slackChannels slackDb) $
-          insertValues channels
-        forM_ (chunksOf 100 messages) $ \chunk -> do
-          runInsert $
-            insert (_slackMessages slackDb) $
-            insertExpressions (mkMessageExpr <$> chunk)
+          insert (_slackMessages slackDb) $
+          insertExpressions (mkMessageExpr <$> chunk)
   pure team
   where
     mkMessageExpr :: Message -> MessageT (QExpr Sqlite s)

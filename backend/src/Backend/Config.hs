@@ -18,6 +18,8 @@ import qualified Data.Text as T
 import Network.HTTP.Client
 import Network.HTTP.Client.TLS
 import Web.ClientSession
+import qualified Database.SQLite.Simple as SQLite
+
 import Obelisk.Route hiding (decode, encode)
 import qualified Obelisk.ExecutableConfig as Cfg
 
@@ -28,6 +30,7 @@ data BackendConfig = BackendConfig
   { _backendConfig_enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute FrontendRoute))) PageName
   , _backendConfig_sessKey :: Key
   , _backendConfig_tlsMgr :: Manager
+  , _backendConfig_sqliteConn :: SQLite.Connection
   , _backendConfig_team :: SlackTeam
   , _backendConfig_pageSize :: Natural
   , _backendConfig_routeEnv :: Text
@@ -42,10 +45,11 @@ data InvalidConfig
 
 instance Exception InvalidConfig
 
-readBackendConfig :: SlackTeam -> IO BackendConfig
-readBackendConfig team = BackendConfig enc
+readBackendConfig :: SQLite.Connection -> SlackTeam -> IO BackendConfig
+readBackendConfig conn team = BackendConfig enc
   <$> (snd <$> randomKey)
   <*> newTlsManager
+  <*> pure conn
   <*> pure team
   <*> pure defaultPageSize
   <*> getConfigNonEmpty "config/common/route"

@@ -4,5 +4,4 @@ result-*
 .attr-cache
 ghcid-output.txt
 tmp
-taut-data.sqlite3
 deploy

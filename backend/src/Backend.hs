@@ -31,7 +31,7 @@ import Common.Types
 import Common.Slack.Types
 
 import Backend.Config
-import Backend.Import (SlackDb (..), dbFile, populateDatabase, slackDb)
+import Backend.Import (SlackDb (..), populateDatabase, slackDb)
 import Backend.Login
 import Backend.Query
 
@@ -39,9 +39,9 @@ import Backend.Query
 backend :: Backend BackendRoute FrontendRoute
 backend = Backend
   { _backend_routeEncoder = backendRouteEncoder
-  , _backend_run = \serve -> do
-      team <- liftIO populateDatabase
-      cfg <- readBackendConfig team
+  , _backend_run = \serve -> SQLite.withConnection "" $ \conn -> do
+      team <- liftIO $ populateDatabase conn
+      cfg <- readBackendConfig conn team
       liftIO $ T.putStrLn $ "routeEnv: " <> _backendConfig_routeEnv cfg
 
       serve $ \case
@@ -58,7 +58,7 @@ backend = Backend
             Left e -> pure $ Left e
             Right t -> do
               pagination <- liftIO $ mkPaginationFromRoute cfg pDay
-              resp <- queryMessages (Query_Day $ paginatedRouteValue pDay) $ pagination
+              resp <- queryMessages cfg (Query_Day $ paginatedRouteValue pDay) $ pagination
               pure $ Right (t, resp)
           writeLBS $ encode resp
         BackendRoute_SearchMessages :/ pQuery -> do
@@ -66,7 +66,7 @@ backend = Backend
             Left e -> pure $ Left e
             Right t -> do
               pagination <- liftIO $ mkPaginationFromRoute cfg pQuery
-              resp <- queryMessages (Query_Like $ paginatedRouteValue pQuery) $ pagination
+              resp <- queryMessages cfg (parseQuery $ paginatedRouteValue pQuery) $ pagination
               pure $ Right (t, resp)
           writeLBS $ encode resp
         _ -> undefined -- FIXME: wtf why does the compiler require this?
@@ -74,8 +74,8 @@ backend = Backend
   where
     mkPaginationFromRoute cfg p = mkPagination (_backendConfig_pageSize cfg) (paginatedRoutePageIndex p)
 
-    queryMessages q (p :: Pagination) = do
-      liftIO $ SQLite.withConnection dbFile $ \conn -> runBeamSqlite conn $ do
+    queryMessages cfg q (p :: Pagination) = do
+      liftIO $ runBeamSqlite (_backendConfig_sqliteConn cfg) $ do
         total <- fmap (fromMaybe 0) $ runSelectReturningOne $
           select $ aggregate_ (\_ -> countAll_) $ filterQuery q $ all_ (_slackMessages slackDb)
         msgs :: Paginated Message <- paginate p (fromIntegral total) $ \offset limit ->
