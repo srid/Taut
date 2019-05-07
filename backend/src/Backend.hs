@@ -27,6 +27,7 @@ import Obelisk.OAuth.Authorization
 import Obelisk.Route hiding (decode, encode)
 
 import Common.Route
+import Common.Types
 import Common.Slack.Types
 
 import Backend.Config
@@ -53,7 +54,7 @@ backend = Backend
             redirect $ T.encodeUtf8 $ fromMaybe (renderFrontendRoute (_backendConfig_enc cfg) $ Route_Home :/ ()) mstate
         BackendRoute_GetMessages :/ pDay -> do
           -- TODO: Use MonadError wherever possible
-          resp <- authorizeUser cfg (Route_Messages :/ pDay) >>= \case
+          resp :: MessagesResponse <- authorizeUser cfg (Route_Messages :/ pDay) >>= \case
             Left e -> pure $ Left e
             Right t -> do
               pagination <- liftIO $ mkPaginationFromRoute cfg pDay
@@ -61,7 +62,7 @@ backend = Backend
               pure $ Right (t, resp)
           writeLBS $ encode resp
         BackendRoute_SearchMessages :/ pQuery -> do
-          resp <- authorizeUser cfg (Route_Search :/ pQuery) >>= \case
+          resp :: MessagesResponse <- authorizeUser cfg (Route_Search :/ pQuery) >>= \case
             Left e -> pure $ Left e
             Right t -> do
               pagination <- liftIO $ mkPaginationFromRoute cfg pQuery

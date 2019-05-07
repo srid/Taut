@@ -12,17 +12,11 @@ module Frontend where
 
 import Control.Monad
 import Data.Bool (bool)
-import Data.Foldable (foldl')
-import Data.Functor.Identity
-import Data.Functor.Sum
-import qualified Data.Map as Map
-import Data.Maybe (fromMaybe, isJust)
 import Data.Semigroup ((<>))
 import Data.Some
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time.Calendar
-import Data.Time.Clock (utctDay)
 import Text.Printf (printf)
 
 import Reflex.Dom.Core
@@ -31,12 +25,10 @@ import Obelisk.Frontend
 import Obelisk.Route.Frontend
 
 import Common.Route
-import Common.Slack.Types
 import Common.Slack.Types.Auth
 import Obelisk.Generated.Static
 
-import Data.Pagination
-
+import Frontend.Message
 import Frontend.Util
 
 
@@ -86,7 +78,7 @@ frontend = Frontend
               elClass "h1" "ui header" $ do
                 text "Messages matching: "
                 dynText $ paginatedRouteValue <$> r
-              resp <- getMessages r $ renderBackendRoute enc . (BackendRoute_SearchMessages :/)
+              resp <- getMessages r $ (BackendRoute_SearchMessages :/)
               widgetHold_ (divClass "ui loading segment" blank) $ ffor resp $ \case
                 Nothing -> text "Something went wrong"
                 Just (Left na) -> notAuthorizedWidget na
@@ -94,13 +86,12 @@ frontend = Frontend
                   renderMessagesWithPagination r Route_Search v
               pure $ fmap fst $ filterRight $ fforMaybe resp id
             Route_Messages -> do
-              -- TODO: this is also paginated
               r :: Dynamic t (PaginatedRoute Day) <- askRoute
               let day = paginatedRouteValue <$> r
               elClass "h1" "ui header" $ do
                 text "Archive for "
                 dynText $ showDay <$> day
-              resp <- getMessages r $ renderBackendRoute enc . (BackendRoute_GetMessages :/)
+              resp <- getMessages r $ (BackendRoute_GetMessages :/)
               widgetHold_ (divClass "ui loading segment" blank) $ ffor resp $ \case
                 Nothing -> text "Something went wrong"
                 Just (Left na) -> notAuthorizedWidget na
@@ -117,7 +108,6 @@ frontend = Frontend
   where
     -- TODO: This should point to the very first day in the archives.
     sampleMsgR = (Route_Messages :/ mkPaginatedRouteAtPage1 (fromGregorian 2019 3 27))
-    Right (enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute Route))) PageName) = checkEncoder backendRouteEncoder
 
     notAuthorizedWidget :: DomBuilder t m => NotAuthorized -> m ()
     notAuthorizedWidget = \case
@@ -134,46 +124,8 @@ frontend = Frontend
     renderMessagesWithPagination r mkR (us, pm) = do
       let pgnW = dyn_ $ ffor r $ \pr ->
             paginationNav pm $ \p' -> mkR :/ (PaginatedRoute (p', paginatedRouteValue pr))
-      pgnW >> renderMessages (us, pm) >> pgnW
+      pgnW >> messageList (us, pm) >> pgnW
 
-    getMessages
-      :: (Reflex t, MonadHold t m, PostBuild t m, DomBuilder t m, Prerender js t m)
-      => Dynamic t r
-      -> (r -> Text)
-      -> m (Event t (Maybe (Either NotAuthorized (SlackUser, ([User], Paginated Message)))))
-    getMessages r mkUrl = switchHold never <=< dyn $ ffor r $ \x -> do
-      fmap switchDyn $ prerender (pure never) $ do
-        pb <- getPostBuild
-        getAndDecode $ mkUrl x <$ pb
-    renderMessages (users', pm)
-      | msgs == [] = text "No results"
-      | otherwise = divClass "ui comments" $ do
-          let users = Map.fromList $ ffor users' $ \u -> (_userId u, _userName u)
-          forM_ (filter (isJust . _messageChannelName) msgs) $ singleMessage users
-      where
-        msgs = paginatedItems pm
     showDay day = T.pack $ printf "%d-%02d-%02d" y m d
       where
         (y, m, d) = toGregorian day
-
-singleMessage
-  :: ( DomBuilder t m
-     , SetRoute t (R Route) m
-     , RouteToUrl (R Route) m
-     )
-  => Map.Map Text Text -> Message -> m ()
-singleMessage users msg = do
-  divClass "comment" $ do
-    divClass "content" $ do
-      elClass "a" "author" $ do
-        text $ maybe "Nobody" (\u -> Map.findWithDefault "Unknown" u users) $ _messageUser msg
-      let day = utctDay $ _messageTs msg
-          r = Route_Messages :/ mkPaginatedRouteAtPage1 day -- TODO: Determine page where message lies.
-      divClass "metadata" $ do
-        divClass "room" $ text $ fromMaybe "Unknown Channel" $ fmap ("#" <>) $ _messageChannelName msg
-        divClass "date" $ do
-          routeLink r $ text $ T.pack $ show $ _messageTs msg
-      elAttr "div" ("class" =: "text") $ do
-        text $ renderText $ _messageText msg
-  where
-    renderText s = foldl' (\m (userId, userName) -> T.replace userId userName m) s (Map.toList users)

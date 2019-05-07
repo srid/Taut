@@ -27,6 +27,7 @@ library
   exposed-modules:
     Frontend
     Frontend.Util
+    Frontend.Message
   ghc-options: -Wall
 
 executable frontend
