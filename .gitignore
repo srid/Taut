@@ -1,9 +1,8 @@
 dist-newstyle
 result
-result-android
-result-ios
+result-*
 .attr-cache
 ghcid-output.txt
 tmp
-result-*
+taut-data.sqlite3
 deploy

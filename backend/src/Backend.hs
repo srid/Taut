@@ -148,7 +148,7 @@ rootDir :: String
 rootDir = "/home/srid/code/Taut/tmp"
 
 dbFile :: String
-dbFile = rootDir <> "/data3.sqlite3"
+dbFile = "taut-data.sqlite3"
 
 data SlackDb f = SlackDb
   { _slackChannels :: f (TableEntity ChannelT)
