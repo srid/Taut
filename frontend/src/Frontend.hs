@@ -22,6 +22,7 @@ import Data.Some
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time.Calendar
+import Data.Time.Clock (utctDay)
 import Text.Printf (printf)
 
 import Reflex.Dom.Core
@@ -155,16 +156,24 @@ frontend = Frontend
       where
         (y, m, d) = toGregorian day
 
-singleMessage :: DomBuilder t m => Map.Map Text Text -> Message -> m ()
+singleMessage
+  :: ( DomBuilder t m
+     , SetRoute t (R Route) m
+     , RouteToUrl (R Route) m
+     )
+  => Map.Map Text Text -> Message -> m ()
 singleMessage users msg = do
   divClass "comment" $ do
     divClass "content" $ do
       elClass "a" "author" $ do
         text $ maybe "Nobody" (\u -> Map.findWithDefault "Unknown" u users) $ _messageUser msg
+      let day = utctDay $ _messageTs msg
+          r = Route_Messages :/ mkPaginatedRouteAtPage1 day -- TODO: Determine page where message lies.
       divClass "metadata" $ do
         divClass "room" $ text $ fromMaybe "Unknown Channel" $ fmap ("#" <>) $ _messageChannelName msg
-        divClass "date" $ text $ T.pack $ show $ _messageTs msg
-      elAttr "div" ("class" =: "text" <> "title" =: T.pack (show msg)) $ do
+        divClass "date" $ do
+          routeLink r $ text $ T.pack $ show $ _messageTs msg
+      elAttr "div" ("class" =: "text") $ do
         text $ renderText $ _messageText msg
   where
     renderText s = foldl' (\m (userId, userName) -> T.replace userId userName m) s (Map.toList users)

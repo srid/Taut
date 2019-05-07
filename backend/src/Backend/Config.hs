@@ -53,7 +53,7 @@ readBackendConfig team = BackendConfig enc
   <*> getConfigNonEmpty "config/backend/oauthClientSecret"
   where
     Right (enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute Route))) PageName) = checkEncoder backendRouteEncoder
-    defaultPageSize = 30
+    defaultPageSize = 50
     getConfigNonEmpty p = Cfg.get p >>= \case
       Nothing -> throwIO $ InvalidConfig_Missing p
       Just v' -> do
