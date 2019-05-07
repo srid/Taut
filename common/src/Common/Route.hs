@@ -26,6 +26,8 @@ import GHC.Natural
 
 import Obelisk.Route
 import Obelisk.Route.TH
+import Obelisk.OAuth.Authorization
+
 
 newtype PaginatedRoute a = PaginatedRoute { unPaginatedRoute ::  (Natural, a) }
   deriving (Eq, Show, Ord)
@@ -39,14 +41,14 @@ paginatedRoutePageIndex = fst . unPaginatedRoute
 paginatedRouteValue :: PaginatedRoute a -> a
 paginatedRouteValue = snd . unPaginatedRoute
 
---TODO: Should we rename `Route` to `AppRoute`?
 data BackendRoute :: * -> * where
   -- | Used to handle unparseable routes.
   BackendRoute_Missing :: BackendRoute ()
-  --TODO: How do we do routes with strongly-typed results?
+  BackendRoute_OAuth :: BackendRoute (R OAuth)
   BackendRoute_GetMessages :: BackendRoute (PaginatedRoute Day)
   BackendRoute_SearchMessages :: BackendRoute (PaginatedRoute Text)
 
+-- TODO: Rename to Frontend Route
 data Route :: * -> * where
   Route_Home :: Route ()
   Route_Messages :: Route (PaginatedRoute Day)
@@ -58,6 +60,7 @@ backendRouteEncoder = handleEncoder (const (InL BackendRoute_Missing :/ ())) $
   pathComponentEncoder $ \case
     InL backendRoute -> case backendRoute of
       BackendRoute_Missing -> PathSegment "missing" $ unitEncoder mempty
+      BackendRoute_OAuth -> PathSegment "oauth" oauthRouteEncoder
       BackendRoute_GetMessages -> PathSegment "get-messages" $
         paginatedEncoder dayEncoderImpl
       BackendRoute_SearchMessages -> PathSegment "search-messages" $

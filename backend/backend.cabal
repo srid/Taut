@@ -8,32 +8,43 @@ library
   if impl(ghcjs)
     buildable: False
   build-depends: base
-               , common
-               , frontend
-               , obelisk-backend
                , aeson
                , beam-core
                , beam-sqlite
                , bytestring
-               , lens
-               , sqlite-simple
-               , split
-               , text
-               , time
-               , reflex-dom-core
-               , obelisk-backend
+               , clientsession
+               , common
                , dependent-sum
                , dependent-sum-template
-               , mmark
-               , modern-uri
-               , pagination
-               , yaml
                , directory
                , filepath
                , foldl
+               , frontend
+               , http-client
+               , http-client-tls
+               , lens
+               , mmark
+               , modern-uri
+               , obelisk-backend
+               , obelisk-backend
+               , obelisk-executable-config
+               , obelisk-oauth-backend
+               , obelisk-oauth-common
+               , obelisk-route
+               , pagination
+               , profunctors
+               , reflex-dom-core
+               , safe-exceptions
                , snap
+               , split
+               , sqlite-simple
+               , text
+               , time
+               , yaml
   exposed-modules:
     Backend
+    Backend.Config
+    Backend.Login
   ghc-options: -Wall
 
 executable backend
@@ -42,31 +53,40 @@ executable backend
   if impl(ghcjs)
     buildable: False
   build-depends: base
-               , backend
                , aeson
-               , split
-               , common
-               , frontend
-               , lens
-               , modern-uri
-               , bytestring
+               , backend
                , beam-core
                , beam-sqlite
-               , sqlite-simple
-               , obelisk-backend
-               , obelisk-executable-config
-               , obelisk-executable-config-inject
-               , text
-               , time
-               , reflex-dom-core
-               , obelisk-backend
+               , bytestring
+               , clientsession
+               , common
                , dependent-sum
                , dependent-sum-template
-               , mmark
-               , modern-uri
-               , pagination
-               , yaml
                , directory
                , filepath
                , foldl
+               , frontend
+               , http-client
+               , http-client-tls
+               , lens
+               , mmark
+               , modern-uri
+               , modern-uri
+               , obelisk-backend
+               , obelisk-backend
+               , obelisk-executable-config
+               , obelisk-executable-config
+               , obelisk-executable-config-inject
+               , obelisk-oauth-backend
+               , obelisk-oauth-common
+               , obelisk-route
+               , pagination
+               , profunctors
+               , reflex-dom-core
+               , safe-exceptions
                , snap
+               , split
+               , sqlite-simple
+               , text
+               , time
+               , yaml
