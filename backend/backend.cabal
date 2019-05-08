@@ -23,6 +23,7 @@ library
                , http-client
                , http-client-tls
                , lens
+               , megaparsec
                , mmark
                , modern-uri
                , obelisk-backend
@@ -71,6 +72,7 @@ executable backend
                , http-client
                , http-client-tls
                , lens
+               , megaparsec
                , mmark
                , modern-uri
                , modern-uri
