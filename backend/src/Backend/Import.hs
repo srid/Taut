@@ -18,7 +18,10 @@ import Data.Aeson
 import qualified Data.ByteString.Lazy as BL
 import Data.List (isSuffixOf)
 import Data.List.Split (chunksOf)
+import Data.Map (Map)
+import qualified Data.Map as Map
 import Data.Maybe (listToMaybe)
+import Data.Text (Text)
 import qualified Data.Text as T
 import System.Directory
 import System.FilePath ((</>))
@@ -63,7 +66,7 @@ schema :: [SQLite.Query]
 schema =
   [ "CREATE TABLE channels (id VARCHAR NOT NULL, name VARCHAR NOT NULL, created VARCHAR NOT NULL, PRIMARY KEY( id ));"
   , "CREATE TABLE users (id VARCHAR NOT NULL, team_id VARCHAR NOT NULL, name VARCHAR NOT NULL, deleted BOOL NOT NULL, color VARCHAR, real_name VARCHAR, tz VARCHAR, tz_label VARCHAR, tz_offset INTEGER, PRIMARY KEY( id ));"
-  , "CREATE TABLE messages (id INTEGER PRIMARY KEY, type VARCHAR NOT NULL, subtype VARCHAR, user VARCHAR, bot_id VARCHAR, text VARCHAR NOT NULL, client_msg_id VARCHAR, ts INT NOT NULL, channel_name VARCHAR);"
+  , "CREATE TABLE messages (id INTEGER PRIMARY KEY, type VARCHAR NOT NULL, subtype VARCHAR, user VARCHAR, user_name VARCHAR, bot_id VARCHAR, text VARCHAR NOT NULL, client_msg_id VARCHAR, ts INT NOT NULL, channel_name VARCHAR);"
   ]
 
 populateDatabase :: SQLite.Connection -> IO SlackTeam
@@ -76,6 +79,7 @@ populateDatabase conn = do
 
   putStrLn $ "Loading " <> show (length messages) <> " messages into memory "
 
+  let userMap = Map.fromList $ flip fmap users $ \u -> (_userId u, _userName u)
   SQLite.withTransaction conn $ do
     -- Create tables
     forM_ schema $ SQLite.execute_ conn
@@ -90,14 +94,15 @@ populateDatabase conn = do
       forM_ (chunksOf 100 messages) $ \chunk -> do
         runInsert $
           insert (_slackMessages slackDb) $
-          insertExpressions (mkMessageExpr <$> chunk)
+          insertExpressions (mkMessageExpr userMap <$> chunk)
   pure team
   where
-    mkMessageExpr :: Message -> MessageT (QExpr Sqlite s)
-    mkMessageExpr m = Message
+    mkMessageExpr :: Map Text Text -> Message -> MessageT (QExpr Sqlite s)
+    mkMessageExpr users m = Message
       (val_ $ _messageType m)
       (val_ $ _messageSubtype m)
       (val_ $ _messageUser m)
+      (val_ $ flip Map.lookup users =<< _messageUser m)
       (val_ $ _messageBotId m)
       (val_ $ _messageText m)
       (val_ $ _messageClientMsgId m)

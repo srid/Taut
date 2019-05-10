@@ -7,12 +7,9 @@
 module Frontend.Message where
 
 import Control.Monad
-import Data.Foldable (foldl')
 import Data.Functor.Identity
 import Data.Functor.Sum
-import qualified Data.Map as Map
 import Data.Maybe (fromMaybe, isJust)
-import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time.Clock (utctDay)
 
@@ -30,12 +27,11 @@ messageList
      , SetRoute t (R FrontendRoute) m
      , RouteToUrl (R FrontendRoute) m
      )
-  => ([User], Paginated Message) -> m ()
-messageList (users', pm)
+  => Paginated Message -> m ()
+messageList pm
   | msgs == [] = text "No results"
   | otherwise = divClass "ui comments" $ do
-      let users = Map.fromList $ ffor users' $ \u -> (_userId u, _userName u)
-      forM_ (filter (isJust . _messageChannelName) msgs) $ singleMessage users
+      forM_ (filter (isJust . _messageChannelName) msgs) $ singleMessage
   where
     msgs = paginatedItems pm
 
@@ -44,12 +40,12 @@ singleMessage
      , SetRoute t (R FrontendRoute) m
      , RouteToUrl (R FrontendRoute) m
      )
-  => Map.Map Text Text -> Message -> m ()
-singleMessage users msg = do
+  => Message -> m ()
+singleMessage msg = do
   divClass "comment" $ do
     divClass "content" $ do
       elClass "a" "author" $ do
-        text $ maybe "Nobody" (\u -> Map.findWithDefault "Unknown" u users) $ _messageUser msg
+        text $ fromMaybe "?unknown?" $ _messageUserName msg
       let day = utctDay $ _messageTs msg
           r = FrontendRoute_Messages :/ mkPaginatedRouteAtPage1 day -- TODO: Determine page where message lies.
       divClass "metadata" $ do
@@ -57,9 +53,7 @@ singleMessage users msg = do
         divClass "date" $ do
           routeLink r $ text $ T.pack $ show $ _messageTs msg
       elAttr "div" ("class" =: "text") $ do
-        text $ renderText $ _messageText msg
-  where
-    renderText s = foldl' (\m (userId, userName) -> T.replace userId userName m) s (Map.toList users)
+        text $ _messageText msg
 
 getMessages
   :: (Reflex t, MonadHold t m, PostBuild t m, DomBuilder t m, Prerender js t m)

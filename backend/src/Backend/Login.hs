@@ -69,11 +69,15 @@ authorizeUser cfg r = do
     allowAnonymousOnLocalhost
       :: Either NotAuthorized SlackUser
       -> Either NotAuthorized SlackUser
-    allowAnonymousOnLocalhost = if T.isPrefixOf "http://localhost:" (_backendConfig_routeEnv cfg)
+    allowAnonymousOnLocalhost = if or (flip T.isPrefixOf (_backendConfig_routeEnv cfg) <$> whitelist)
       then Right . either (const dummyUser) id
       else id
       where
         dummyUser = SlackUser "localbody" "U11111111"
+        whitelist =
+          [ "http://localhost:"
+          , "http://10.100.0.2:"  -- Wireguard
+          ]
 
 setSlackTokenToCookie :: MonadSnap m => BackendConfig -> SlackTokenResponse -> m ()
 setSlackTokenToCookie cfg = setAuthToken (_backendConfig_sessKey cfg) . encode
