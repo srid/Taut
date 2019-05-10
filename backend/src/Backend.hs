@@ -73,10 +73,16 @@ backend = Backend
             Left e -> pure $ Left e
             Right t -> do
               pagination <- liftIO $ mkPaginationFromRoute cfg pQuery
-              let mf = mkMessageFilters $ either (throwString . show) id $ parseSearchQuery $ paginatedRouteValue pQuery
-              liftIO $ putStrLn $ show mf
-              resp <- queryMessages cfg mf $ pagination
-              pure $ Right (t, resp)
+              case parseSearchQuery (paginatedRouteValue pQuery) of
+                Left err -> do
+                  liftIO $ putStrLn $ show err
+                  -- TODO: return this error to user
+                  liftIO $ throwString $ "Bad query: " <> show err
+                Right q -> do
+                  let mf = mkMessageFilters q
+                  liftIO $ putStrLn $ show mf
+                  resp <- queryMessages cfg mf $ pagination
+                  pure $ Right (t, resp)
           writeLBS $ encode resp
   }
   where
