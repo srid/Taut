@@ -10,13 +10,10 @@
 module Backend.Query where
 
 import Control.Lens hiding ((<.))
-import Data.Foldable (foldr1)
-import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NEL
+import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Time.Calendar
-import Data.Time.Clock
 import Data.Void
 
 import Database.Beam
@@ -79,6 +76,9 @@ data MessageFilters = MessageFilters
 
 makeLenses ''MessageFilters
 
+allMessages :: MessageFilters
+allMessages = MessageFilters [] [] [] Nothing
+
 mkMessageFilters :: [Either SearchModifier SearchKeyword] -> MessageFilters
 mkMessageFilters = foldl f ini
   where
@@ -108,49 +108,12 @@ messageFilters
   => MessageFilters
   -> Q be SlackDb s (MessageT (QExpr be s))
   -> Q be SlackDb s (MessageT (QExpr be s))
-messageFilters mf = filter_ $ \msg -> foldr1 (&&.) $
-  [ foldr1 (&&.) $ msgContaining msg <$> (unSearchKeyword <$> _messageFilters_terms mf) -- TODO: Use NonEmpty list
-  , foldr1 (||.) $ msgFrom msg <$> _messageFilters_from mf
+messageFilters mf = filter_ $ \msg -> foldl (&&.) (val_ True) $ catMaybes $
+  [ maybe Nothing (Just . foldl1 (&&.)) $ NEL.nonEmpty $
+      msgContaining msg . unSearchKeyword <$> mf ^. messageFilters_terms
+  , maybe Nothing (Just . foldl1 (||.)) $ NEL.nonEmpty $
+      msgFrom msg <$> mf ^. messageFilters_from
   ]
   where
     msgContaining msg q = _messageText msg `like_` val_ ("%" <> q <> "%")
     msgFrom msg user = _messageUser msg ==. val_ (Just user)
-  -- Query_Day day ->
-  --   let fromDate = UTCTime day 0
-  --       toDate = UTCTime (addDays 1 day) 0
-  --   in filter_ (\msg -> (_messageTs msg >=. val_ fromDate) &&. (_messageTs msg <. val_ toDate))
-  -- Query_Like q -> filter_ $ msgContaining q
-  -- Query_And qs -> filter_ $ \msg -> foldr1 (&&.) $ flip msgContaining msg <$> qs
-
-
--- OLD CODE BELOW
-
-data Query
-  = Query_Day Day
-  | Query_Like Text
-  | Query_And (NonEmpty Text)
-
-parseQuery :: Text -> Query
-parseQuery query = case NEL.nonEmpty (T.words query) of
-  Nothing -> Query_Like query
-  Just qs -> Query_And qs
-
-filterQuery
-  :: forall be s.
-     ( BeamSqlBackend be
-     , BeamSqlBackendIsString be Text
-     , HasSqlValueSyntax (BeamSqlBackendValueSyntax be) Text
-     , HasSqlValueSyntax (BeamSqlBackendValueSyntax be) UTCTime
-     )
-  => Query
-  -> Q be SlackDb s (MessageT (QExpr be s))
-  -> Q be SlackDb s (MessageT (QExpr be s))
-filterQuery = \case
-  Query_Day day ->
-    let fromDate = UTCTime day 0
-        toDate = UTCTime (addDays 1 day) 0
-    in filter_ (\msg -> (_messageTs msg >=. val_ fromDate) &&. (_messageTs msg <. val_ toDate))
-  Query_Like q -> filter_ $ msgContaining q
-  Query_And qs -> filter_ $ \msg -> foldr1 (&&.) $ flip msgContaining msg <$> qs
-  where
-    msgContaining q msg = _messageText msg `like_` val_ ("%" <> q <> "%")

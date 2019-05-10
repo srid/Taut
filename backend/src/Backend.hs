@@ -58,7 +58,7 @@ backend = Backend
             Left e -> pure $ Left e
             Right t -> do
               pagination <- liftIO $ mkPaginationFromRoute cfg pDay
-              resp <- queryMessages cfg (Query_Day $ paginatedRouteValue pDay) $ pagination
+              resp <- queryMessages cfg allMessages $ pagination -- TODO
               pure $ Right (t, resp)
           writeLBS $ encode resp
         BackendRoute_SearchMessages :/ pQuery -> do
@@ -66,7 +66,8 @@ backend = Backend
             Left e -> pure $ Left e
             Right t -> do
               pagination <- liftIO $ mkPaginationFromRoute cfg pQuery
-              resp <- queryMessages cfg (parseQuery $ paginatedRouteValue pQuery) $ pagination
+              let mf = mkMessageFilters $ either (throwString . show) id $ parseSearchQuery $ paginatedRouteValue pQuery
+              resp <- queryMessages cfg mf $ pagination
               pure $ Right (t, resp)
           writeLBS $ encode resp
         _ -> undefined -- FIXME: wtf why does the compiler require this?
@@ -74,14 +75,14 @@ backend = Backend
   where
     mkPaginationFromRoute cfg p = mkPagination (_backendConfig_pageSize cfg) (paginatedRoutePageIndex p)
 
-    queryMessages cfg q (p :: Pagination) = do
+    queryMessages cfg mf (p :: Pagination) = do
       liftIO $ runBeamSqlite (_backendConfig_sqliteConn cfg) $ do
         total <- fmap (fromMaybe 0) $ runSelectReturningOne $
-          select $ aggregate_ (\_ -> countAll_) $ filterQuery q $ all_ (_slackMessages slackDb)
+          select $ aggregate_ (\_ -> countAll_) $ messageFilters mf $ all_ (_slackMessages slackDb)
         msgs :: Paginated Message <- paginate p (fromIntegral total) $ \offset limit ->
           runSelectReturningList $ select $
             limit_ limit $ offset_ offset $
-              orderBy_ (asc_ . _messageTs) $ filterQuery q $ all_ (_slackMessages slackDb)
+              orderBy_ (asc_ . _messageTs) $ messageFilters mf $ all_ (_slackMessages slackDb)
         -- TODO: separate endpoint for this?
         users :: [User] <- runSelectReturningList $
           select $ all_ (_slackUsers slackDb)
