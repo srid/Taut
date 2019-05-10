@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric #-}
+ {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
@@ -10,8 +10,11 @@ module Backend where
 
 import Control.Arrow ((&&&))
 import Control.Exception.Safe (throwString)
+import Control.Lens
 import Data.Aeson
+import Data.Dependent.Sum (DSum ((:=>)))
 import Data.Foldable (foldl')
+import Data.Functor.Identity (Identity(..))
 import Data.Maybe (fromMaybe)
 import Data.Monoid ((<>))
 import qualified Data.Text as T
@@ -48,32 +51,33 @@ backend = Backend
       liftIO $ T.putStrLn $ "routeEnv: " <> _backendConfig_routeEnv cfg
 
       serve $ \case
-        BackendRoute_Missing :/ () -> do
+        BackendRoute_Missing :=> Identity () -> do
           writeLBS "404"
-        BackendRoute_OAuth :/ OAuth_RedirectUri :/ p -> case p of
+        BackendRoute_OAuth :=> Identity (OAuth_RedirectUri :=> Identity p) -> case p of
           Nothing -> liftIO $ throwString "Expected to receive the authorization code here"
           Just (RedirectUriParams code mstate) -> do
             handleOAuthCallback cfg code
             redirect $ T.encodeUtf8 $ fromMaybe (renderFrontendRoute (_backendConfig_enc cfg) $ FrontendRoute_Home :/ ()) mstate
-        BackendRoute_GetMessages :/ pDay -> do
+        BackendRoute_GetMessages :=> Identity pDay -> do
           -- TODO: Use MonadError wherever possible
           resp :: MessagesResponse <- authorizeUser cfg (FrontendRoute_Messages :/ pDay) >>= \case
             Left e -> pure $ Left e
             Right t -> do
               pagination <- liftIO $ mkPaginationFromRoute cfg pDay
-              resp <- queryMessages cfg allMessages $ pagination -- TODO
+              let day = paginatedRouteValue pDay
+              resp <- queryMessages cfg (allMessages & messageFilters_during %~ (day:)) $ pagination
               pure $ Right (t, resp)
           writeLBS $ encode resp
-        BackendRoute_SearchMessages :/ pQuery -> do
+        BackendRoute_SearchMessages :=> Identity pQuery -> do
           resp :: MessagesResponse <- authorizeUser cfg (FrontendRoute_Search :/ pQuery) >>= \case
             Left e -> pure $ Left e
             Right t -> do
               pagination <- liftIO $ mkPaginationFromRoute cfg pQuery
               let mf = mkMessageFilters $ either (throwString . show) id $ parseSearchQuery $ paginatedRouteValue pQuery
+              liftIO $ putStrLn $ show mf
               resp <- queryMessages cfg mf $ pagination
               pure $ Right (t, resp)
           writeLBS $ encode resp
-        _ -> undefined -- FIXME: wtf why does the compiler require this?
   }
   where
     mkPaginationFromRoute cfg p = mkPagination (_backendConfig_pageSize cfg) (paginatedRoutePageIndex p)
