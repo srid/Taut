@@ -39,7 +39,8 @@ import Common.Types
 import Backend.Config
 import Backend.Import (SlackDb (..), populateDatabase, slackDb)
 import Backend.Login
-import Backend.Query
+import Backend.Search.Parser (parseSearchQuery)
+import Backend.Search
 
 
 backend :: Backend BackendRoute FrontendRoute
