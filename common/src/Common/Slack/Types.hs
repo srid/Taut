@@ -124,19 +124,20 @@ instance FromJSON Message where
     type_ <- o .: "type"
     subtype <- o .:? "subtype"
     user <- o .:? "user"
-    userid <- o .:? "user_id"
+    username <- o .:? "user_name"
     botid <- o .:? "bot_id"
     txt <- o .: "text"
     msgid <- o .:? "client_msg_id"
     ts <- parseSlackTimestamp =<< o .: "ts"
     channelName <- o .:? "channel_name"
-    pure $ Message type_ subtype user userid botid txt msgid ts channelName
+    pure $ Message type_ subtype user username botid txt msgid ts channelName
 
 instance ToJSON Message where
   toJSON m = object
     [ "type" .= _messageType m
     , "subtype" .= _messageSubtype m
     , "user" .= _messageUser m
+    , "user_name" .= _messageUserName m
     , "bot_id" .= _messageBotId m
     , "text" .= _messageText m
     , "client_msg_id" .= _messageClientMsgId m

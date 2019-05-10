@@ -122,10 +122,10 @@ frontend = Frontend
         slackLoginButton r = elAttr "a" ("href" =: r) $
           elAttr "img" ("src" =: "https://api.slack.com/img/sign_in_with_slack.png") blank
 
-    renderMessagesWithPagination r mkR (us, pm) = do
+    renderMessagesWithPagination r mkR pm = do
       let pgnW = dyn_ $ ffor r $ \pr ->
             paginationNav pm $ \p' -> mkR :/ (PaginatedRoute (p', paginatedRouteValue pr))
-      pgnW >> messageList (us, pm) >> pgnW
+      pgnW >> messageList pm >> pgnW
 
     showDay day = T.pack $ printf "%d-%02d-%02d" y m d
       where

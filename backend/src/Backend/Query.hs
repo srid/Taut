@@ -95,7 +95,6 @@ demo = parseTest
   (sepBy (Left <$> try searchModifier <|> Right <$> searchKeyword) space1)
   "from:srid hello world  has:pin in:general more  query"
 
-
 messageFilters
   :: forall be s.
      ( BeamSqlBackend be
