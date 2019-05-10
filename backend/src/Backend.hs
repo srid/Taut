@@ -79,11 +79,13 @@ backend = Backend
       liftIO $ runBeamSqlite (_backendConfig_sqliteConn cfg) $ do
         total <- fmap (fromMaybe 0) $ runSelectReturningOne $
           select $ aggregate_ (\_ -> countAll_) $ messageFilters mf $ all_ (_slackMessages slackDb)
-        msgs :: Paginated Message <- paginate p (fromIntegral total) $ \offset limit ->
-          runSelectReturningList $ select $
-            limit_ limit $ offset_ offset $
-              orderBy_ (asc_ . _messageTs) $ messageFilters mf $ all_ (_slackMessages slackDb)
-        -- TODO: separate endpoint for this?
+        msgs :: Paginated Message <- paginate p (fromIntegral total) $ \offset limit -> do
+          let q = limit_ limit $ offset_ offset $
+                  orderBy_ (asc_ . _messageTs) $ messageFilters mf $ all_ (_slackMessages slackDb)
+          -- liftIO $ dumpSqlSelect $ limit_ limit $ offset_ offset $
+          --         orderBy_ (asc_ . _messageTs) $ messageFilters mf $ all_ (_slackMessages slackDb)
+          runSelectReturningList $ select q
+        -- TODO: separate endpoint for this? Maybe just use a JOIN.
         users :: [User] <- runSelectReturningList $
           select $ all_ (_slackUsers slackDb)
         pure (users, msgs)

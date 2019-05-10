@@ -101,7 +101,6 @@ messageFilters
      ( BeamSqlBackend be
      , BeamSqlBackendIsString be Text
      , HasSqlValueSyntax (BeamSqlBackendValueSyntax be) Text
-     , HasSqlValueSyntax (BeamSqlBackendValueSyntax be) (Maybe Text)
      , HasSqlEqualityCheck be Text
      -- , HasSqlValueSyntax (BeamSqlBackendValueSyntax be) UTCTime
      )
@@ -116,4 +115,4 @@ messageFilters mf = filter_ $ \msg -> foldl (&&.) (val_ True) $ catMaybes $
   ]
   where
     msgContaining msg q = _messageText msg `like_` val_ ("%" <> q <> "%")
-    msgFrom msg user = _messageUser msg ==. val_ (Just user)
+    msgFrom msg (user :: Text) = _messageUserName msg ==. just_ (val_ user) -- FIXME: join with userName

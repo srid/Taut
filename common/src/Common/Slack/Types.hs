@@ -85,6 +85,7 @@ data MessageT f = Message
   { _messageType :: Columnar f Text
   , _messageSubtype :: Columnar f (Maybe Text)
   , _messageUser :: Columnar f (Maybe Text) -- Join with User ID
+  , _messageUserName :: Columnar f (Maybe Text) -- Because I'm lazy to do a join. :-P
   , _messageBotId :: Columnar f (Maybe Text)
   , _messageText :: Columnar f Text
   , _messageClientMsgId :: Columnar f (Maybe Text) -- XXX: This can be empty?
@@ -123,12 +124,13 @@ instance FromJSON Message where
     type_ <- o .: "type"
     subtype <- o .:? "subtype"
     user <- o .:? "user"
+    userid <- o .:? "user_id"
     botid <- o .:? "bot_id"
     txt <- o .: "text"
     msgid <- o .:? "client_msg_id"
     ts <- parseSlackTimestamp =<< o .: "ts"
     channelName <- o .:? "channel_name"
-    pure $ Message type_ subtype user botid txt msgid ts channelName
+    pure $ Message type_ subtype user userid botid txt msgid ts channelName
 
 instance ToJSON Message where
   toJSON m = object
