@@ -69,10 +69,8 @@ frontend = Frontend
                 Nothing -> text "Unable to load search examples"
                 Just (Left na) -> notAuthorizedWidget na
                 Just (Right (_, examples)) -> do
-                  elClass "h2" "ui header" $ do
-                    divClass "content" $ do
-                      text "Search examples"
-                      divClass "sub header" $ text "Begin browsing the archive using these search queries!"
+                  elHeader "h2" (text "Search examples") $
+                    text "Begin browsing the archive using these search queries!"
                   divClass "ui two column centered grid" $ divClass "column" $
                     divClass "ui list" $ forM_ examples $ \(title, query) -> do
                       divClass "item" $ divClass "ui piled segment" $ do
@@ -90,14 +88,20 @@ frontend = Frontend
                 Just (Right (_, (mf, v))) -> do
                   case Search.isOnlyDuring mf of
                     Nothing -> do
-                      elClass "h2" "ui header" $ do
-                        text "Messages matching: "
-                        dynText $ paginatedRouteValue <$> r
+                      elHeader "h2" (text "Results") $ do
+                        text "Displaying messages matching the query \""
+                        el "tt" $ dynText $ paginatedRouteValue <$> r
+                        text "\"."
                     Just day -> do
-                      elClass "h2" "ui header" $ do
-                        text $ "Messages on day: " <> showDay day
-                      routeLink (routeForDay $ addDays (-1) day) $ elClass "button" "ui button" $ text "Prev Day"
-                      routeLink (routeForDay $ addDays 1 day) $ elClass "button" "ui button" $ text "Next Day"
+                      elHeader "h2" (text $ showDay day) $ do
+                        text "Displaying messages sent on this day. "
+                        text "Go to "
+                        routeLink (routeForDay $ addDays (-1) day) $ do
+                          text "previous"
+                        text " day. Go to "
+                        routeLink (routeForDay $ addDays 1 day) $
+                          text "next"
+                        text " day."
                   renderMessagesWithPagination r FrontendRoute_Search v
               pure $ fmap fst $ filterRight $ fforMaybe resp id
           divClass "ui bottom attached secondary segment" $ do

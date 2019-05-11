@@ -52,6 +52,12 @@ subRouteMenu rs = do
     let active = ffor r $ \(r' :/ _) -> mr == This r'
     w active
 
+elHeader :: DomBuilder t m => Text -> m a -> m b -> m b
+elHeader ele h s = elClass ele "ui header" $
+  divClass "content" $ do
+    void $ h
+    divClass "sub header" s
+
 searchInputWidget
   :: forall t m.
      ( DomBuilder t m
