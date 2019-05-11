@@ -20,10 +20,8 @@ import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Time.Calendar
 import Data.Time.Clock
 import GHC.Natural
-import Text.Read (readMaybe)
 
 import Obelisk.OAuth.Authorization
 import Obelisk.Route
@@ -92,12 +90,12 @@ paginatedEncoder aEncoderImpl = unsafeMkEncoder $ EncoderImpl
     { _encoderImpl_decode = \(path, query) -> do
         a <- _encoderImpl_decode aEncoderImpl path
         pure $ PaginatedRoute
-          ( fromMaybe 1 $ read . T.unpack <$> join (Map.lookup "page" query)
+          ( fromMaybe 1 $ read . T.unpack <$> join (Map.lookup "p" query)
           , a
           )
     , _encoderImpl_encode = \(PaginatedRoute (n, a)) ->
         ( _encoderImpl_encode aEncoderImpl a
-        , if n > 1 then Map.singleton "page" (Just $ T.pack $ show n) else mempty
+        , if n > 1 then Map.singleton "p" (Just $ T.pack $ show n) else mempty
         )
     }
 
@@ -111,32 +109,6 @@ textEncoderImpl = EncoderImpl
       _ -> throwError "textEncoderImpl: expected exactly 1 path element"
   , _encoderImpl_encode = \x -> [x]
   }
-
-dayEncoder
-  :: (Applicative check, MonadError Text parse)
-  => Encoder check parse Day [Text]
-dayEncoder = unsafeMkEncoder dayEncoderImpl
-
-dayEncoderImpl
-  :: (MonadError Text parse)
-  => EncoderImpl parse Day [Text]
-dayEncoderImpl = EncoderImpl
-  { _encoderImpl_decode = \case
-      [y, m, d] -> maybe (throwError "dayEncoder: invalid day") pure $ parseDay y m d
-      _ -> throwError "dayEncoder: expected exactly 3 path elements"
-  , _encoderImpl_encode = \day -> encodeDay day
-  }
-  where
-    parseDay y' m' d' = do
-      y <- readMaybe $ T.unpack y'
-      m <- readMaybe $ T.unpack m'
-      d <- readMaybe $ T.unpack d'
-      fromGregorianValid y m d
-
-encodeDay :: Day -> [Text]
-encodeDay day = [T.pack $ show y, T.pack $ show m, T.pack $ show d]
-  where
-    (y, m, d) = toGregorian day
 
 
 concat <$> mapM deriveRouteComponent
