@@ -14,6 +14,7 @@ import Control.Monad
 import Data.Dependent.Sum (DSum ((:=>)))
 import Data.Functor.Identity (Identity (..))
 import Data.Semigroup ((<>))
+import qualified Data.Text as T
 import Data.Time.Calendar
 
 import Reflex.Dom.Core
@@ -60,7 +61,7 @@ frontend = Frontend
                     FrontendRoute_Home :=> Identity () -> ""
                     FrontendRoute_Search :=> Identity pr -> paginatedRouteValue pr
               searchInputWidgetWithRoute query $ \q ->
-                FrontendRoute_Search :/ (PaginatedRoute (1, q))
+                FrontendRoute_Search :/ (PaginatedRoute (1, T.strip q))
 
           fmap switchDyn $ subRoute $ \case
             FrontendRoute_Home -> do
