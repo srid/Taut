@@ -26,12 +26,7 @@ import Common.Slack.Internal (formatSlackTimestamp)
 import Common.Slack.Types
 import Common.Types
 
-messageList
-  :: ( DomBuilder t m
-     , SetRoute t (R FrontendRoute) m
-     , RouteToUrl (R FrontendRoute) m
-     )
-  => Paginated Message -> m ()
+messageList :: DomBuilder t m => Paginated Message -> m ()
 messageList pm
   | msgs == [] = text "No results"
   | otherwise = divClass "ui comments" $ do
@@ -39,25 +34,26 @@ messageList pm
   where
     msgs = paginatedItems pm
 
-singleMessage
-  :: ( DomBuilder t m
-     , SetRoute t (R FrontendRoute) m
-     , RouteToUrl (R FrontendRoute) m
-     )
-  => Message -> m ()
+singleMessage :: DomBuilder t m => Message -> m ()
 singleMessage msg = do
-  divClass "comment" $ do
+  let mts = formatSlackTimestamp (_messageTs msg)
+  elAttr "div" ("class" =: "comment" <> "id" =: mts) $ do
     divClass "content" $ do
       elClass "a" "author" $ do
         text $ fromMaybe "?unknown?" $ _messageUserName msg
-      let r = FrontendRoute_Search :/ (mkPaginatedRouteAtPage1 $ "at:" <> formatSlackTimestamp (_messageTs msg))
       divClass "metadata" $ do
         divClass "room" $
           text $ fromMaybe "Unknown Channel" $ fmap ("#" <>) $ _messageChannelName msg
         divClass "date" $ do
-          routeLink r $ text $ T.pack $ show $ _messageTs msg
+          case _messageChannelName msg of
+            Nothing -> text $ T.pack $ show $ _messageTs msg
+            Just ch -> do
+              let rr = renderBackendRoute enc $ BackendRoute_LocateMessage :/ (ch, _messageTs msg)
+              elAttr "a" ("href" =: rr) $ text $ T.pack $ show $ _messageTs msg
       elAttr "div" ("class" =: "text") $ do
         renderSlackMessage $ _messageText msg
+  where
+    Right (enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute FrontendRoute))) PageName) = checkEncoder backendRouteEncoder
 
 -- TODO: This is not perfect yet.
 renderSlackMessage :: DomBuilder t m => Text -> m ()

@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -37,6 +38,12 @@ data NotAuthorized
   = NotAuthorized_RequireLogin Text
   | NotAuthorized_WrongTeam SlackTeam Text
   deriving (Eq, Show, Generic)
+
+-- | Extract the slack login link out of NotAuthorized
+notAuthorizedLoginLink :: NotAuthorized -> Text
+notAuthorizedLoginLink = \case
+  NotAuthorized_RequireLogin l -> l
+  NotAuthorized_WrongTeam _ l -> l
 
 -- | Slack's OAuth JSON field label modifier
 fieldLabelMod :: Options

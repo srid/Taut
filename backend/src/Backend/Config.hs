@@ -57,7 +57,13 @@ readBackendConfig conn team = BackendConfig enc
   <*> getConfigNonEmpty "config/backend/oauthClientSecret"
   where
     Right (enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute FrontendRoute))) PageName) = checkEncoder backendRouteEncoder
-    defaultPageSize = 50
+    -- WARNING: Changing the default page size will invalidate existing message
+    -- permalinks (which contain page index embedded in them).
+    --
+    -- The only solution here is to get rid of page-index pagination and use
+    -- ?afterTs or some such thing, while making sure frontend page navigation
+    -- is still possible.
+    defaultPageSize = 30
     getConfigNonEmpty p = Cfg.get p >>= \case
       Nothing -> throwIO $ InvalidConfig_Missing p
       Just v' -> do

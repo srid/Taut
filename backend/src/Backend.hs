@@ -20,6 +20,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.IO as T
+import Control.Lens
 
 import Database.Beam
 import Database.Beam.Sqlite (runBeamSqlite)
@@ -34,6 +35,9 @@ import Obelisk.Route hiding (decode, encode)
 
 import Common.Route
 import Common.Slack.Types
+import Common.Slack.Internal
+import Common.Slack.Types.Auth
+import Common.Slack.Types.Search
 import Common.Types
 
 import Backend.Config
@@ -60,7 +64,7 @@ backend = Backend
             handleOAuthCallback cfg code
             redirect $ T.encodeUtf8 $ fromMaybe (renderFrontendRoute (_backendConfig_enc cfg) $ FrontendRoute_Home :/ ()) mstate
         BackendRoute_GetSearchExamples :=> Identity () -> do
-          resp :: ExamplesResponse <- authorizeUser cfg (FrontendRoute_Home :/ ()) >>= \case
+          resp :: ExamplesResponse <- authorizeUser cfg (renderFrontendRoute (_backendConfig_enc cfg) $ FrontendRoute_Home :/ ()) >>= \case
             Left e -> pure $ Left e
             Right u -> do
               -- TODO: This should be generic, and dates determined automatically.
@@ -68,11 +72,24 @@ backend = Backend
                     [ ("Do a basic search", "sunny day")
                     , ("Use quotes for exact match", "\"great day\"")
                     , ("Browse messages on a particular day", "during:2018-8-23")
+                    , ("All messages in #general channel", "in:general")
                     ]
               pure $ Right (u, examples)
           writeLBS $ encode resp
+        BackendRoute_LocateMessage :=> Identity (ch, t) -> do
+          authorizeUser cfg (renderBackendRoute (_backendConfig_enc cfg) $ BackendRoute_LocateMessage :/ (ch, t)) >>= \case
+            Left e -> redirect $ T.encodeUtf8 $ notAuthorizedLoginLink e
+            Right _ -> do
+              let mf = allMessages & messageFilters_in .~ [ch]
+              page <- liftIO $ runBeamSqlite (_backendConfig_sqliteConn cfg) $ do
+                total <- countMessages cfg mf
+                after <- countMessages cfg $ mf & messageFilters_at ?~ t
+                let pgSize = fromIntegral $ _backendConfig_pageSize cfg
+                pure $ fromIntegral $ 1 + (toInteger (total - after) `quot` pgSize)
+              redirect $ T.encodeUtf8 $ (renderFrontendRoute (_backendConfig_enc cfg) $
+                FrontendRoute_Search :/ PaginatedRoute (page, "in:" <> ch)) <> "#" <> (formatSlackTimestamp t)
         BackendRoute_SearchMessages :=> Identity pQuery -> do
-          resp :: MessagesResponse <- authorizeUser cfg (FrontendRoute_Search :/ pQuery) >>= \case
+          resp :: MessagesResponse <- authorizeUser cfg (renderFrontendRoute (_backendConfig_enc cfg) $ FrontendRoute_Search :/ pQuery) >>= \case
             Left e -> pure $ Left e
             Right u -> do
               pagination <- liftIO $ mkPaginationFromRoute cfg pQuery
@@ -91,6 +108,10 @@ backend = Backend
   where
     mkPaginationFromRoute cfg p = mkPagination (_backendConfig_pageSize cfg) (paginatedRoutePageIndex p)
 
+    countMessages cfg mf = do
+      liftIO $ runBeamSqlite (_backendConfig_sqliteConn cfg) $ do
+        fmap (fromMaybe 0) $ runSelectReturningOne $
+          select $ aggregate_ (\_ -> countAll_) $ messageFilters mf $ all_ (_slackMessages slackDb)
     queryMessages cfg mf (p :: Pagination) = do
       (users, msgs) <- liftIO $ runBeamSqlite (_backendConfig_sqliteConn cfg) $ do
         total <- fmap (fromMaybe 0) $ runSelectReturningOne $

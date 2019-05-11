@@ -56,11 +56,14 @@ messageFilters mf = filter_ $ \msg -> foldl (&&.) (val_ True) $ catMaybes $
       msgFrom msg <$> mf ^. messageFilters_from
   , maybe Nothing (Just . foldl1 (||.)) $ NEL.nonEmpty $
       msgDuring msg <$> mf ^. messageFilters_during
+  , maybe Nothing (Just . foldl1 (||.)) $ NEL.nonEmpty $
+      msgInChannel msg <$> mf ^. messageFilters_in
   , msgAt msg <$> mf ^. messageFilters_at
   ]
   where
     msgContaining msg q = _messageText msg `like_` val_ ("%" <> q <> "%")
-    msgFrom msg (user :: Text) = _messageUserName msg ==. just_ (val_ user) -- FIXME: join with userName
+    msgFrom msg (user :: Text) = _messageUserName msg ==. just_ (val_ user)
+    msgInChannel msg (ch :: Text) = _messageChannelName msg ==. just_ (val_ ch)
     msgDuring msg day = _messageTs msg >=. val_ fromTs &&. _messageTs msg <. val_ toTs
       where
         fromTs = UTCTime day 0
