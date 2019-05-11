@@ -64,7 +64,7 @@ dayParser = do
 timeParser :: Parser UTCTime
 timeParser = do
   void $ try $ string "at:"
-  ts :: Double <- L.float
+  ts :: Integer <- L.decimal
   parseSlackTimestamp $ T.pack (show ts)
 
 searchKeyword :: Parser SearchKeyword

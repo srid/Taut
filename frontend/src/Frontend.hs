@@ -50,16 +50,17 @@ frontend = Frontend
             routeLink (FrontendRoute_Home :/ ()) $
               elClass "h1" "ui inverted header" $ text "Taut - Slack Archive Viewer"
         divClass "ui attached segment" $ do
-          divClass ("ui raised segment " <> themeColor) $ divClass "ui icon inverted fluid input" $ do
-            r <- askRoute
-            -- NOTE: setRoute should ideally scroll to top automaticlly, but it
-            -- does not so we do it here.
-            widgetHold_ blank $ ffor (updated r) $ const scrollToTop
-            let query = ffor r $ \case
-                  FrontendRoute_Home :=> Identity () -> ""
-                  FrontendRoute_Search :=> Identity pr -> paginatedRouteValue pr
-            searchInputWidgetWithRoute query $ \q ->
-              FrontendRoute_Search :/ (PaginatedRoute (1, q))
+          divClass ("ui raised large segment " <> themeColor) $ divClass "ui search" $ do
+            divClass "ui icon inverted fluid input" $ do
+              r <- askRoute
+              -- NOTE: setRoute should ideally scroll to top automaticlly, but it
+              -- does not so we do it here.
+              widgetHold_ blank $ ffor (updated r) $ const scrollToTop
+              let query = ffor r $ \case
+                    FrontendRoute_Home :=> Identity () -> ""
+                    FrontendRoute_Search :=> Identity pr -> paginatedRouteValue pr
+              searchInputWidgetWithRoute query $ \q ->
+                FrontendRoute_Search :/ (PaginatedRoute (1, q))
 
           userE <- fmap switchDyn $ subRoute $ \case
             FrontendRoute_Home -> do
