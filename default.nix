@@ -19,6 +19,7 @@ project ./. ({ pkgs, hackGet, ... }: {
     };
     obelisk-oauth-common = obelisk-oauth + "/common";
     obelisk-oauth-backend = obelisk-oauth + "/backend";
+    pagination = hackGet ./dep/pagination; # https://github.com/mrkkrp/pagination/issues/6
   };
 
   overrides = self: super: with pkgs.haskell.lib; let
@@ -47,6 +48,6 @@ project ./. ({ pkgs, hackGet, ... }: {
     vector-sized = doJailbreak (self.callCabal2nix "vector-sized" vector-sized-src {});
     indexed-list-literals = doJailbreak super.indexed-list-literals;
     email-validate = doJailbreak super.email-validate;
-    pagination = dontCheck super.pagination; # https://github.com/mrkkrp/pagination/issues/6
+    pagination = dontCheck super.pagination;
   };
 })
