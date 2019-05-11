@@ -72,6 +72,7 @@ backend = Backend
                     , ("Use quotes for exact match", "\"great day\"")
                     , ("Browse messages on a particular day", "during:2018-8-23")
                     , ("All messages in #general channel", "in:general")
+                    , ("Messages by Andrew in #random channel", "in:random from:andrew")
                     ]
               pure $ Right (u, examples)
           writeLBS $ encode resp
