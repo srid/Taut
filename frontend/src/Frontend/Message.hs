@@ -26,12 +26,7 @@ import Common.Slack.Internal (formatSlackTimestamp)
 import Common.Slack.Types
 import Common.Types
 
-messageList
-  :: ( DomBuilder t m
-     , SetRoute t (R FrontendRoute) m
-     , RouteToUrl (R FrontendRoute) m
-     )
-  => Paginated Message -> m ()
+messageList :: DomBuilder t m => Paginated Message -> m ()
 messageList pm
   | msgs == [] = text "No results"
   | otherwise = divClass "ui comments" $ do
@@ -39,19 +34,13 @@ messageList pm
   where
     msgs = paginatedItems pm
 
-singleMessage
-  :: ( DomBuilder t m
-     , SetRoute t (R FrontendRoute) m
-     , RouteToUrl (R FrontendRoute) m
-     )
-  => Message -> m ()
+singleMessage :: DomBuilder t m => Message -> m ()
 singleMessage msg = do
   let mts = formatSlackTimestamp (_messageTs msg)
   elAttr "div" ("class" =: "comment" <> "id" =: mts) $ do
     divClass "content" $ do
       elClass "a" "author" $ do
         text $ fromMaybe "?unknown?" $ _messageUserName msg
-      -- let r = FrontendRoute_Search :/ (mkPaginatedRouteAtPage1 $ "at:" <> mts)
       divClass "metadata" $ do
         divClass "room" $
           text $ fromMaybe "Unknown Channel" $ fmap ("#" <>) $ _messageChannelName msg

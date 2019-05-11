@@ -16,7 +16,6 @@ import Control.Category (Category (..))
 import Control.Monad.Except
 import Data.Functor.Identity
 import Data.Functor.Sum
-import qualified Data.Map as Map
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -109,7 +108,6 @@ textEncoderImpl = EncoderImpl
       _ -> throwError "textEncoderImpl: expected exactly 1 path element"
   , _encoderImpl_encode = \x -> [x]
   }
-
 
 concat <$> mapM deriveRouteComponent
   [ ''FrontendRoute
