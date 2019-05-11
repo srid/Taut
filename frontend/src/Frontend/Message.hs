@@ -46,18 +46,24 @@ singleMessage
      )
   => Message -> m ()
 singleMessage msg = do
-  divClass "comment" $ do
+  let mts = formatSlackTimestamp (_messageTs msg)
+  elAttr "div" ("class" =: "comment" <> "id" =: mts) $ do
     divClass "content" $ do
       elClass "a" "author" $ do
         text $ fromMaybe "?unknown?" $ _messageUserName msg
-      let r = FrontendRoute_Search :/ (mkPaginatedRouteAtPage1 $ "at:" <> formatSlackTimestamp (_messageTs msg))
+      -- let r = FrontendRoute_Search :/ (mkPaginatedRouteAtPage1 $ "at:" <> mts)
+      let r = BackendRoute_LocateMessage :/ (_messageTs msg)
       divClass "metadata" $ do
         divClass "room" $
           text $ fromMaybe "Unknown Channel" $ fmap ("#" <>) $ _messageChannelName msg
         divClass "date" $ do
-          routeLink r $ text $ T.pack $ show $ _messageTs msg
+          -- routeLink r $ text $ T.pack $ show $ _messageTs msg
+          let rr = renderBackendRoute enc r
+          elAttr "a" ("href" =: rr) $ text $ T.pack $ show $ _messageTs msg
       elAttr "div" ("class" =: "text") $ do
         renderSlackMessage $ _messageText msg
+  where
+    Right (enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute FrontendRoute))) PageName) = checkEncoder backendRouteEncoder
 
 -- TODO: This is not perfect yet.
 renderSlackMessage :: DomBuilder t m => Text -> m ()

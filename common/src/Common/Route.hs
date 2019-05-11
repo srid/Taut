@@ -1,5 +1,4 @@
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
@@ -8,25 +7,29 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
 module Common.Route where
 
-import Prelude hiding ((.), id)
+import Prelude hiding (id, (.))
 
 import Control.Category (Category (..))
 import Control.Monad.Except
-import Data.Functor.Sum
 import Data.Functor.Identity
-import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Functor.Sum
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
+import Data.Text (Text)
+import qualified Data.Text as T
 import Data.Time.Calendar
-import Text.Read (readMaybe)
+import Data.Time.Clock
 import GHC.Natural
+import Text.Read (readMaybe)
 
+import Obelisk.OAuth.Authorization
 import Obelisk.Route
 import Obelisk.Route.TH
-import Obelisk.OAuth.Authorization
+
+import Common.Slack.Internal
 
 
 newtype PaginatedRoute a = PaginatedRoute { unPaginatedRoute ::  (Natural, a) }
@@ -46,6 +49,7 @@ data BackendRoute :: * -> * where
   BackendRoute_Missing :: BackendRoute ()
   BackendRoute_OAuth :: BackendRoute (R OAuth)
   BackendRoute_GetSearchExamples :: BackendRoute ()
+  BackendRoute_LocateMessage :: BackendRoute UTCTime
   BackendRoute_SearchMessages :: BackendRoute (PaginatedRoute Text)
 
 data FrontendRoute :: * -> * where
@@ -60,6 +64,7 @@ backendRouteEncoder = handleEncoder (const (InL BackendRoute_Missing :/ ())) $
       BackendRoute_Missing -> PathSegment "missing" $ unitEncoder mempty
       BackendRoute_OAuth -> PathSegment "oauth" oauthRouteEncoder
       BackendRoute_GetSearchExamples -> PathSegment "get-search-examples" $ unitEncoder mempty
+      BackendRoute_LocateMessage -> PathSegment "locate-message" utcTimeEncoder
       BackendRoute_SearchMessages -> PathSegment "search-messages" $
         paginatedEncoder textEncoderImpl
     InR obeliskRoute -> obeliskRouteSegment obeliskRoute $ \case
@@ -68,6 +73,15 @@ backendRouteEncoder = handleEncoder (const (InL BackendRoute_Missing :/ ())) $
       FrontendRoute_Home -> PathEnd $ unitEncoder mempty
       FrontendRoute_Search -> PathSegment "search" $
         paginatedEncoder textEncoderImpl
+
+utcTimeEncoder
+  :: (Applicative check, MonadError Text parse)
+  => Encoder check parse UTCTime PageName
+utcTimeEncoder = unsafeMkEncoder $ EncoderImpl
+  { _encoderImpl_decode = \([path], _query) -> do
+      parseSlackTimestamp path
+  , _encoderImpl_encode = \t -> ([formatSlackTimestamp t], mempty)
+  }
 
 paginatedEncoder
   :: (Applicative check, MonadError Text parse)

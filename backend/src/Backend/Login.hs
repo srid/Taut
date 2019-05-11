@@ -31,7 +31,6 @@ import Web.ClientSession
 
 import Obelisk.OAuth.AccessToken
 import Obelisk.OAuth.Authorization
-import Obelisk.Route hiding (decode, encode)
 
 import Common.Route
 import Common.Slack.Types.Auth
@@ -42,7 +41,7 @@ import Backend.Config
 authorizeUser
   :: MonadSnap m
   => BackendConfig
-  -> R FrontendRoute  -- ^ The route to redirect after signing in to Slack
+  -> Text -- ^ The route to redirect after signing in to Slack
   -> m (Either NotAuthorized SlackUser)
 authorizeUser cfg r = do
   tok <- getAuthToken (_backendConfig_sessKey cfg)
@@ -64,7 +63,7 @@ authorizeUser cfg r = do
     -- of the frontend (where it would be most appropriate) is because of a
     -- bug in obelisk missing exe-config (we need routeEnv) in the frontend
     -- post hydration.
-    ll = mkSlackLoginLink cfg $ Just $ renderFrontendRoute (_backendConfig_enc cfg) r
+    ll = mkSlackLoginLink cfg $ Just r
 
     allowAnonymousOnLocalhost
       :: Either NotAuthorized SlackUser
