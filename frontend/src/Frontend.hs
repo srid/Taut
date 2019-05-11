@@ -46,12 +46,11 @@ frontend = Frontend
       elAttr "link" ("rel" =: "stylesheet" <> "type" =: "text/css" <> "href" =: static @"semantic.min.css") blank
   , _frontend_body = do
       divClass "ui container" $ do
-        let color = "green"
-        divClass ("ui top attached inverted segment " <> color) $
+        divClass ("ui top attached inverted segment " <> themeColor) $
             routeLink (FrontendRoute_Home :/ ()) $
               elClass "h1" "ui inverted header" $ text "Taut - Slack Archive Viewer"
         divClass "ui attached segment" $ do
-          divClass ("ui raised segment " <> color) $ divClass "ui icon inverted fluid input" $ do
+          divClass ("ui raised segment " <> themeColor) $ divClass "ui icon inverted fluid input" $ do
             r <- askRoute
             -- NOTE: setRoute should ideally scroll to top automaticlly, but it
             -- does not so we do it here.
@@ -89,19 +88,20 @@ frontend = Frontend
                   case Search.isOnlyDuring mf of
                     Nothing -> do
                       elHeader "h2" (text "Results") $ do
-                        text "Displaying messages matching the query \""
+                        text "Displaying messages matching the query "
                         el "tt" $ dynText $ paginatedRouteValue <$> r
-                        text "\"."
+                        text "."
                     Just day -> do
                       elHeader "h2" (text $ showDay day) $ do
                         text "Displaying messages sent on this day. "
                         text "Go to "
                         routeLink (routeForDay $ addDays (-1) day) $ do
-                          text "previous"
+                          el "b" $ text "previous"
                         text " day. Go to "
                         routeLink (routeForDay $ addDays 1 day) $
-                          text "next"
+                          el "b" $ text "next"
                         text " day."
+                  divClass "ui horizontal divider" blank
                   renderMessagesWithPagination r FrontendRoute_Search v
               pure $ fmap fst $ filterRight $ fforMaybe resp id
           divClass "ui bottom attached secondary segment" $ do
@@ -123,6 +123,6 @@ frontend = Frontend
           elAttr "img" ("src" =: "https://api.slack.com/img/sign_in_with_slack.png") blank
 
     renderMessagesWithPagination r mkR pm = do
-      let pgnW = dyn_ $ ffor r $ \pr ->
+      let pageW = dyn_ $ ffor r $ \pr ->
             paginationNav pm $ \p' -> mkR :/ (PaginatedRoute (p', paginatedRouteValue pr))
-      pgnW >> messageList pm >> pgnW
+      pageW >> messageList pm >> pageW

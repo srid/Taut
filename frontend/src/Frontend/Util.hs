@@ -42,6 +42,9 @@ import Obelisk.Route.Frontend
 import Reflex.Dom
 import Data.Pagination
 
+themeColor :: Text
+themeColor = "green"
+
 subRouteMenu
   :: (GEq r, DomBuilder t m)
   => [(Some r, (Dynamic t Bool -> RoutedT t (R r) m ()))]
@@ -101,7 +104,7 @@ paginationNav
   -> m ()
 paginationNav p mkRoute = when (hasOtherPages p) $ do
   let idx = pageIndex $ paginatedPagination p
-  divClass "ui message" $ do
+  divClass ("ui message " <> themeColor) $ do
     when (hasPrevPage p) $
       routeLink (mkRoute $ sub1Natural idx) $
         elClass "button" "ui button" $ text "Prev"
