@@ -10,8 +10,11 @@ import Control.Monad
 import Data.Functor.Identity
 import Data.Functor.Sum
 import Data.Maybe (fromMaybe, isJust)
+import Data.Text (Text)
 import qualified Data.Text as T
+import Data.Time.Calendar
 import Data.Time.Clock (utctDay)
+import Text.Printf (printf)
 
 import Obelisk.Route.Frontend
 import Reflex.Dom.Core
@@ -47,7 +50,7 @@ singleMessage msg = do
       elClass "a" "author" $ do
         text $ fromMaybe "?unknown?" $ _messageUserName msg
       let day = utctDay $ _messageTs msg
-          r = FrontendRoute_Messages :/ mkPaginatedRouteAtPage1 day -- TODO: Determine page where message lies.
+          r = routeForDay day -- TODO: Determine page where message lies.
       divClass "metadata" $ do
         divClass "room" $ text $ fromMaybe "Unknown Channel" $ fmap ("#" <>) $ _messageChannelName msg
         divClass "date" $ do
@@ -66,3 +69,11 @@ getMessages dr mkUrl = switchHold never <=< dyn $ ffor dr $ \r -> do
     getAndDecode $ (renderBackendRoute enc . mkUrl) r <$ pb
   where
     Right (enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute FrontendRoute))) PageName) = checkEncoder backendRouteEncoder
+
+routeForDay :: Day -> R FrontendRoute
+routeForDay day = FrontendRoute_Search :/ mkPaginatedRouteAtPage1 ("during:" <> showDay day)
+
+showDay :: Day -> Text
+showDay day = T.pack $ printf "%d-%02d-%02d" y m d
+  where
+    (y, m, d) = toGregorian day

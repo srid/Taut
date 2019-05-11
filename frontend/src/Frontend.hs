@@ -15,18 +15,17 @@ import Data.Bool (bool)
 import Data.Semigroup ((<>))
 import Data.Some
 import Data.Text (Text)
-import qualified Data.Text as T
 import Data.Time.Calendar
-import Text.Printf (printf)
 
 import Reflex.Dom.Core
 
 import Obelisk.Frontend
 import Obelisk.Route.Frontend
+import Obelisk.Generated.Static
 
 import Common.Route
 import Common.Slack.Types.Auth
-import Obelisk.Generated.Static
+import qualified Common.Slack.Types.Search as Search
 
 import Frontend.Message
 import Frontend.Util
@@ -54,9 +53,6 @@ frontend = Frontend
             [ ( This FrontendRoute_Home
               , \isActive -> routeLinkClass (FrontendRoute_Home :/ ()) (itemClass isActive) $ text "Home"
               )
-            , ( This FrontendRoute_Messages
-              , \isActive -> routeLinkClass sampleMsgR (itemClass isActive) $ text "Archive"
-              )
             , ( This FrontendRoute_Search
               , \isActive -> divClass "right menu" $ do
                   widgetHold_ blank $ ffor userE $ \(SlackUser name _) ->
@@ -76,40 +72,27 @@ frontend = Frontend
               pure never
             FrontendRoute_Search -> do
               r  :: Dynamic t (PaginatedRoute Text) <- askRoute
-              elClass "h1" "ui header" $ do
-                text "Messages matching: "
-                dynText $ paginatedRouteValue <$> r
               resp <- getMessages r $ (BackendRoute_SearchMessages :/)
               widgetHold_ (divClass "ui loading segment" blank) $ ffor resp $ \case
                 Nothing -> text "Something went wrong"
                 Just (Left na) -> notAuthorizedWidget na
-                Just (Right (_, v)) -> do
+                Just (Right (_, (mf, v))) -> do
+                  case Search.isOnlyDuring mf of
+                    Nothing -> do
+                      elClass "h1" "ui header" $ do
+                        text "Messages matching: "
+                        dynText $ paginatedRouteValue <$> r
+                    Just day -> do
+                      elClass "h1" "ui header" $ do
+                        text $ "Messages on day: " <> showDay day
+                      routeLink (routeForDay $ addDays (-1) day) $ elClass "button" "ui button" $ text "Prev Day"
+                      routeLink (routeForDay $ addDays 1 day) $ elClass "button" "ui button" $ text "Next Day"
                   renderMessagesWithPagination r FrontendRoute_Search v
-              pure $ fmap fst $ filterRight $ fforMaybe resp id
-            FrontendRoute_Messages -> do
-              r :: Dynamic t (PaginatedRoute Day) <- askRoute
-              let day = paginatedRouteValue <$> r
-              elClass "h1" "ui header" $ do
-                text "Archive for "
-                dynText $ showDay <$> day
-              resp <- getMessages r $ (BackendRoute_GetMessages :/)
-              widgetHold_ (divClass "ui loading segment" blank) $ ffor resp $ \case
-                Nothing -> text "Something went wrong"
-                Just (Left na) -> notAuthorizedWidget na
-                Just (Right (_, v)) -> do
-                  dyn_ $ ffor day $ \d -> do
-                    routeLink (FrontendRoute_Messages :/ mkPaginatedRouteAtPage1 (addDays (-1) d)) $ elClass "button" "ui button" $ text "Prev Day"
-                  dyn_ $ ffor day $ \d -> do
-                    routeLink (FrontendRoute_Messages :/ mkPaginatedRouteAtPage1 (addDays 1 d)) $ elClass "button" "ui button" $ text "Next Day"
-                  renderMessagesWithPagination r FrontendRoute_Messages v
               pure $ fmap fst $ filterRight $ fforMaybe resp id
           divClass "ui bottom attached secondary segment" $ do
             elAttr "a" ("href" =: "https://github.com/srid/Taut") $ text "Powered by Haskell"
   }
   where
-    -- TODO: This should point to the very first day in the archives.
-    sampleMsgR = FrontendRoute_Messages :/ mkPaginatedRouteAtPage1 (fromGregorian 2019 3 27)
-
     notAuthorizedWidget :: DomBuilder t m => NotAuthorized -> m ()
     notAuthorizedWidget = \case
       NotAuthorized_RequireLogin grantHref -> divClass "ui segment" $ do
@@ -126,7 +109,3 @@ frontend = Frontend
       let pgnW = dyn_ $ ffor r $ \pr ->
             paginationNav pm $ \p' -> mkR :/ (PaginatedRoute (p', paginatedRouteValue pr))
       pgnW >> messageList pm >> pgnW
-
-    showDay day = T.pack $ printf "%d-%02d-%02d" y m d
-      where
-        (y, m, d) = toGregorian day

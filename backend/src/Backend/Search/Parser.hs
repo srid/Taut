@@ -67,6 +67,7 @@ quotedText = do
   void $ string "\""
   pure s
 
+-- FIXME: Won't include stuff like hyphens.
 someWord :: Parser Text
 someWord = T.pack <$> some alphaNumChar -- TODO: Review the accuracy of this
 

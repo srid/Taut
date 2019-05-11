@@ -10,7 +10,6 @@ module Backend where
 
 import Control.Arrow ((&&&))
 import Control.Exception.Safe (throwString)
-import Control.Lens
 import Data.Aeson
 import Data.Dependent.Sum (DSum ((:=>)))
 import Data.Foldable (foldl')
@@ -59,20 +58,10 @@ backend = Backend
           Just (RedirectUriParams code mstate) -> do
             handleOAuthCallback cfg code
             redirect $ T.encodeUtf8 $ fromMaybe (renderFrontendRoute (_backendConfig_enc cfg) $ FrontendRoute_Home :/ ()) mstate
-        BackendRoute_GetMessages :=> Identity pDay -> do
-          -- TODO: Use MonadError wherever possible
-          resp :: MessagesResponse <- authorizeUser cfg (FrontendRoute_Messages :/ pDay) >>= \case
-            Left e -> pure $ Left e
-            Right t -> do
-              pagination <- liftIO $ mkPaginationFromRoute cfg pDay
-              let day = paginatedRouteValue pDay
-              resp <- queryMessages cfg (allMessages & messageFilters_during %~ (day:)) $ pagination
-              pure $ Right (t, resp)
-          writeLBS $ encode resp
         BackendRoute_SearchMessages :=> Identity pQuery -> do
           resp :: MessagesResponse <- authorizeUser cfg (FrontendRoute_Search :/ pQuery) >>= \case
             Left e -> pure $ Left e
-            Right t -> do
+            Right u -> do
               pagination <- liftIO $ mkPaginationFromRoute cfg pQuery
               case parseSearchQuery (paginatedRouteValue pQuery) of
                 Left err -> do
@@ -82,8 +71,8 @@ backend = Backend
                 Right q -> do
                   let mf = mkMessageFilters q
                   liftIO $ putStrLn $ show mf
-                  resp <- queryMessages cfg mf $ pagination
-                  pure $ Right (t, resp)
+                  msgs <- queryMessages cfg mf $ pagination
+                  pure $ Right (u, (mf, msgs))
           writeLBS $ encode resp
   }
   where
