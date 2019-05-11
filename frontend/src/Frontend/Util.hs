@@ -75,7 +75,7 @@ searchInputWidgetWithRoute
   => Dynamic t Text
   -> (Text -> R route)
   -> m ()
-searchInputWidgetWithRoute dq mkRoute = divClass "ui transparent icon inverted input" $ do
+searchInputWidgetWithRoute dq mkRoute = do
   (val, submit) <- searchInputWidget dq
   setRoute $ mkRoute <$> tag (current val) submit
   dyn_ $ ffor val $ \q' ->
