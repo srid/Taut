@@ -11,22 +11,20 @@
 module Frontend where
 
 import Control.Monad
-import Data.Bool (bool)
+import Data.Dependent.Sum (DSum ((:=>)))
+import Data.Functor.Identity (Identity (..))
 import Data.Semigroup ((<>))
-import Data.Some
-import Data.Text (Text)
-import qualified Data.Text as T
 import Data.Time.Calendar
-import Text.Printf (printf)
 
 import Reflex.Dom.Core
 
 import Obelisk.Frontend
+import Obelisk.Generated.Static
 import Obelisk.Route.Frontend
 
 import Common.Route
 import Common.Slack.Types.Auth
-import Obelisk.Generated.Static
+import qualified Common.Slack.Types.Search as Search
 
 import Frontend.Message
 import Frontend.Util
@@ -37,7 +35,7 @@ frontend = Frontend
   { _frontend_head = do
       elAttr "base" ("href" =: "/") blank
       elAttr "meta" ("name" =: "viewport" <> "content" =: "width=device-width, initial-scale=1") blank
-      el "title" $ text "Taut - Slack Archives"
+      el "title" $ text "Taut - Slack Archive Viewer"
       -- FIXME: This throws JSException
       -- el "title" $ subRoute_ $ \case
       --   Route_Home -> text "Taut"
@@ -48,68 +46,70 @@ frontend = Frontend
       elAttr "link" ("rel" =: "stylesheet" <> "type" =: "text/css" <> "href" =: static @"semantic.min.css") blank
   , _frontend_body = do
       divClass "ui container" $ do
-        divClass "ui attached segment" $ mdo
-          let itemClass active = bool "item" "active item" <$> active
-          divClass "ui pointing inverted menu" $ subRouteMenu
-            [ ( This FrontendRoute_Home
-              , \isActive -> routeLinkClass (FrontendRoute_Home :/ ()) (itemClass isActive) $ text "Home"
-              )
-            , ( This FrontendRoute_Messages
-              , \isActive -> routeLinkClass sampleMsgR (itemClass isActive) $ text "Archive"
-              )
-            , ( This FrontendRoute_Search
-              , \isActive -> divClass "right menu" $ do
-                  widgetHold_ blank $ ffor userE $ \(SlackUser name _) ->
-                    divClass "item" $ text $ "Welcome " <> name
-                  elDynClass "div" (itemClass isActive) $ do
-                    -- FIXME: On hard page refresh the query is not being set as initial value in input.
-                    query <- fmap join $ subRoute $ \case
-                      FrontendRoute_Search -> fmap paginatedRouteValue <$> askRoute
-                      _ -> pure $ constDyn ""
-                    searchInputWidgetWithRoute query $ \q' ->
-                      FrontendRoute_Search :/ (PaginatedRoute (1, q'))
-              )
-            ]
-          userE :: Event t SlackUser <- divClass "ui segment" $ fmap switchDyn $ subRoute $ \case
-            FrontendRoute_Home -> el "p" $ do
-              text "Welcome to Taut, the Slack archive viewer. Click 'Archive' or do a search."
+        divClass ("ui top attached inverted segment " <> themeColor) $
+            routeLink (FrontendRoute_Home :/ ()) $
+              elClass "h1" "ui inverted header" $ text "Taut - Slack Archive Viewer"
+        divClass "ui attached segment" $ do
+          divClass ("ui raised segment " <> themeColor) $ divClass "ui icon inverted fluid input" $ do
+            r <- askRoute
+            -- NOTE: setRoute should ideally scroll to top automaticlly, but it
+            -- does not so we do it here.
+            widgetHold_ blank $ ffor (updated r) $ const scrollToTop
+            let query = ffor r $ \case
+                  FrontendRoute_Home :=> Identity () -> ""
+                  FrontendRoute_Search :=> Identity pr -> paginatedRouteValue pr
+            searchInputWidgetWithRoute query $ \q ->
+              FrontendRoute_Search :/ (PaginatedRoute (1, q))
+
+          userE <- fmap switchDyn $ subRoute $ \case
+            FrontendRoute_Home -> do
+              examplesE <- getSearchExamples
+              widgetHold_ blank $ ffor examplesE $ \case
+                Nothing -> text "Unable to load search examples"
+                Just (Left na) -> notAuthorizedWidget na
+                Just (Right (_, examples)) -> do
+                  elHeader "h2" (text "Search examples") $
+                    text "Begin browsing the archive using these search queries!"
+                  divClass "ui two column centered grid" $ divClass "column" $
+                    divClass "ui list" $ forM_ examples $ \(title, query) -> do
+                      divClass "item" $ divClass "ui piled segment" $ do
+                        let r = FrontendRoute_Search :/ mkPaginatedRouteAtPage1 query
+                        routeLinkClass r "ui header" $ text query
+                        divClass "description" $ text title
+                  el "p" blank
               pure never
             FrontendRoute_Search -> do
-              r  :: Dynamic t (PaginatedRoute Text) <- askRoute
-              elClass "h1" "ui header" $ do
-                text "Messages matching: "
-                dynText $ paginatedRouteValue <$> r
-              resp <- getMessages r $ (BackendRoute_SearchMessages :/)
+              r  <- askRoute
+              resp <- getMessages r (BackendRoute_SearchMessages :/)
               widgetHold_ (divClass "ui loading segment" blank) $ ffor resp $ \case
                 Nothing -> text "Something went wrong"
                 Just (Left na) -> notAuthorizedWidget na
-                Just (Right (_, v)) -> do
+                Just (Right (_, (mf, v))) -> do
+                  case Search.isOnlyDuring mf of
+                    Nothing -> do
+                      elHeader "h2" (text "Results") $ do
+                        text "Displaying messages matching the query "
+                        el "tt" $ dynText $ paginatedRouteValue <$> r
+                        text "."
+                    Just day -> do
+                      elHeader "h2" (text $ showDay day) $ do
+                        text "Displaying messages sent on this day. "
+                        text "Go to "
+                        routeLink (routeForDay $ addDays (-1) day) $ do
+                          el "b" $ text "previous"
+                        text " day. Go to "
+                        routeLink (routeForDay $ addDays 1 day) $
+                          el "b" $ text "next"
+                        text " day."
+                  divClass "ui horizontal divider" blank
                   renderMessagesWithPagination r FrontendRoute_Search v
-              pure $ fmap fst $ filterRight $ fforMaybe resp id
-            FrontendRoute_Messages -> do
-              r :: Dynamic t (PaginatedRoute Day) <- askRoute
-              let day = paginatedRouteValue <$> r
-              elClass "h1" "ui header" $ do
-                text "Archive for "
-                dynText $ showDay <$> day
-              resp <- getMessages r $ (BackendRoute_GetMessages :/)
-              widgetHold_ (divClass "ui loading segment" blank) $ ffor resp $ \case
-                Nothing -> text "Something went wrong"
-                Just (Left na) -> notAuthorizedWidget na
-                Just (Right (_, v)) -> do
-                  dyn_ $ ffor day $ \d -> do
-                    routeLink (FrontendRoute_Messages :/ mkPaginatedRouteAtPage1 (addDays (-1) d)) $ elClass "button" "ui button" $ text "Prev Day"
-                  dyn_ $ ffor day $ \d -> do
-                    routeLink (FrontendRoute_Messages :/ mkPaginatedRouteAtPage1 (addDays 1 d)) $ elClass "button" "ui button" $ text "Next Day"
-                  renderMessagesWithPagination r FrontendRoute_Messages v
               pure $ fmap fst $ filterRight $ fforMaybe resp id
           divClass "ui bottom attached secondary segment" $ do
             elAttr "a" ("href" =: "https://github.com/srid/Taut") $ text "Powered by Haskell"
+            widgetHold_ blank $ ffor userE $ \(SlackUser name _) ->
+              divClass "item" $ text $ "Welcome " <> name
   }
   where
-    -- TODO: This should point to the very first day in the archives.
-    sampleMsgR = FrontendRoute_Messages :/ mkPaginatedRouteAtPage1 (fromGregorian 2019 3 27)
-
     notAuthorizedWidget :: DomBuilder t m => NotAuthorized -> m ()
     notAuthorizedWidget = \case
       NotAuthorized_RequireLogin grantHref -> divClass "ui segment" $ do
@@ -123,10 +123,6 @@ frontend = Frontend
           elAttr "img" ("src" =: "https://api.slack.com/img/sign_in_with_slack.png") blank
 
     renderMessagesWithPagination r mkR pm = do
-      let pgnW = dyn_ $ ffor r $ \pr ->
+      let pageW = dyn_ $ ffor r $ \pr ->
             paginationNav pm $ \p' -> mkR :/ (PaginatedRoute (p', paginatedRouteValue pr))
-      pgnW >> messageList pm >> pgnW
-
-    showDay day = T.pack $ printf "%d-%02d-%02d" y m d
-      where
-        (y, m, d) = toGregorian day
+      pageW >> messageList pm >> pageW

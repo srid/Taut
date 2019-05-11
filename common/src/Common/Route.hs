@@ -45,12 +45,11 @@ data BackendRoute :: * -> * where
   -- | Used to handle unparseable routes.
   BackendRoute_Missing :: BackendRoute ()
   BackendRoute_OAuth :: BackendRoute (R OAuth)
-  BackendRoute_GetMessages :: BackendRoute (PaginatedRoute Day)
+  BackendRoute_GetSearchExamples :: BackendRoute ()
   BackendRoute_SearchMessages :: BackendRoute (PaginatedRoute Text)
 
 data FrontendRoute :: * -> * where
   FrontendRoute_Home :: FrontendRoute ()
-  FrontendRoute_Messages :: FrontendRoute (PaginatedRoute Day)
   FrontendRoute_Search :: FrontendRoute (PaginatedRoute Text)
 
 backendRouteEncoder
@@ -60,16 +59,13 @@ backendRouteEncoder = handleEncoder (const (InL BackendRoute_Missing :/ ())) $
     InL backendRoute -> case backendRoute of
       BackendRoute_Missing -> PathSegment "missing" $ unitEncoder mempty
       BackendRoute_OAuth -> PathSegment "oauth" oauthRouteEncoder
-      BackendRoute_GetMessages -> PathSegment "get-messages" $
-        paginatedEncoder dayEncoderImpl
+      BackendRoute_GetSearchExamples -> PathSegment "get-search-examples" $ unitEncoder mempty
       BackendRoute_SearchMessages -> PathSegment "search-messages" $
         paginatedEncoder textEncoderImpl
     InR obeliskRoute -> obeliskRouteSegment obeliskRoute $ \case
       -- The encoder given to PathEnd determines how to parse query parameters,
       -- in this example, we have none, so we insist on it.
       FrontendRoute_Home -> PathEnd $ unitEncoder mempty
-      FrontendRoute_Messages -> PathSegment "messages" $
-        paginatedEncoder dayEncoderImpl
       FrontendRoute_Search -> PathSegment "search" $
         paginatedEncoder textEncoderImpl
 

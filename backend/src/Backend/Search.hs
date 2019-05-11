@@ -20,33 +20,22 @@ import Database.Beam
 import Database.Beam.Backend.SQL
 
 import Common.Slack.Types
+import Common.Slack.Types.Search
 
 import Backend.Import (SlackDb (..))
 import Backend.Search.Parser (SearchKeyword(..), SearchModifier(..))
 
-data MessageFilters = MessageFilters
-  { _messageFilters_terms :: [SearchKeyword]
-  , _messageFilters_from :: [Text]
-  , _messageFilters_in :: [Text]
-  , _messageFilters_during :: [Day]
-  , _messageFilters_hasPin :: Maybe ()
-  }
-  deriving (Show, Generic)
-
-makeLenses ''MessageFilters
-
-allMessages :: MessageFilters
-allMessages = MessageFilters [] [] [] [] Nothing
 
 mkMessageFilters :: [Either SearchModifier SearchKeyword] -> MessageFilters
 mkMessageFilters = foldl f allMessages
   where
     f mf = \case
-      Right kw -> mf & messageFilters_terms %~ (kw:)
+      Right kw -> mf & messageFilters_terms %~ (unSearchKeyword kw:)
       Left md -> case md of
         SearchModifier_From user -> mf & messageFilters_from %~ (user:)
         SearchModifier_In chan -> mf & messageFilters_in %~ (chan:)
         SearchModifier_During day -> mf & messageFilters_during %~ (day:)
+        SearchModifier_At t -> mf & messageFilters_at ?~ t
         SearchModifier_HasPin -> mf & messageFilters_hasPin ?~ ()
 
 messageFilters
@@ -62,11 +51,12 @@ messageFilters
   -> Q be SlackDb s (MessageT (QExpr be s))
 messageFilters mf = filter_ $ \msg -> foldl (&&.) (val_ True) $ catMaybes $
   [ maybe Nothing (Just . foldl1 (&&.)) $ NEL.nonEmpty $
-      msgContaining msg . unSearchKeyword <$> mf ^. messageFilters_terms
+      msgContaining msg <$> mf ^. messageFilters_terms
   , maybe Nothing (Just . foldl1 (||.)) $ NEL.nonEmpty $
       msgFrom msg <$> mf ^. messageFilters_from
   , maybe Nothing (Just . foldl1 (||.)) $ NEL.nonEmpty $
       msgDuring msg <$> mf ^. messageFilters_during
+  , msgAt msg <$> mf ^. messageFilters_at
   ]
   where
     msgContaining msg q = _messageText msg `like_` val_ ("%" <> q <> "%")
@@ -75,3 +65,4 @@ messageFilters mf = filter_ $ \msg -> foldl (&&.) (val_ True) $ catMaybes $
       where
         fromTs = UTCTime day 0
         toTs = UTCTime (addDays 1 day) 0
+    msgAt msg t = _messageTs msg >=. val_ t

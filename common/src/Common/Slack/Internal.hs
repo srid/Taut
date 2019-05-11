@@ -16,9 +16,9 @@ fieldLabelMod = defaultOptions
   { fieldLabelModifier = toQuietSnake . fromHumps . dropWhile (not . isUpper)
   }
 
-parseSlackTimestamp :: Applicative f => Text -> f UTCTime
+parseSlackTimestamp :: Monad f => Text -> f UTCTime
 parseSlackTimestamp ts' = case readMaybe (T.unpack ts') of
-  Nothing -> error $ "Invalid ts: " <> T.unpack ts'
+  Nothing -> fail $ "Invalid Slack timestamp: " <> T.unpack ts'
   Just (ts :: Double) -> do
     -- FIXME: Not sure if `round` is problematic here. We want this value to be unique.
     pure $ posixSecondsToUTCTime $ fromInteger $ round ts

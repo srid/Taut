@@ -35,9 +35,15 @@ import qualified Data.Text as T
 import Data.Text (Text)
 import Prelude
 
+import JSDOM
+import JSDOM.Window
+
 import Obelisk.Route.Frontend
 import Reflex.Dom
 import Data.Pagination
+
+themeColor :: Text
+themeColor = "green"
 
 subRouteMenu
   :: (GEq r, DomBuilder t m)
@@ -48,6 +54,12 @@ subRouteMenu rs = do
     r <- askRoute
     let active = ffor r $ \(r' :/ _) -> mr == This r'
     w active
+
+elHeader :: DomBuilder t m => Text -> m a -> m b -> m b
+elHeader ele h s = elClass ele "ui header" $
+  divClass "content" $ do
+    void $ h
+    divClass "sub header" s
 
 searchInputWidget
   :: forall t m.
@@ -75,7 +87,7 @@ searchInputWidgetWithRoute
   => Dynamic t Text
   -> (Text -> R route)
   -> m ()
-searchInputWidgetWithRoute dq mkRoute = divClass "ui transparent icon inverted input" $ do
+searchInputWidgetWithRoute dq mkRoute = do
   (val, submit) <- searchInputWidget dq
   setRoute $ mkRoute <$> tag (current val) submit
   dyn_ $ ffor val $ \q' ->
@@ -92,7 +104,7 @@ paginationNav
   -> m ()
 paginationNav p mkRoute = when (hasOtherPages p) $ do
   let idx = pageIndex $ paginatedPagination p
-  divClass "ui message" $ do
+  divClass ("ui message " <> themeColor) $ do
     when (hasPrevPage p) $
       routeLink (mkRoute $ sub1Natural idx) $
         elClass "button" "ui button" $ text "Prev"
@@ -139,6 +151,10 @@ routeLink' r elementTag attr w = do
         & elementConfig_eventSpec %~ addEventSpecFlags (Proxy :: Proxy (DomBuilderSpace m)) Click (\_ -> preventDefault)
         & elementConfig_initialAttributes .~ (attr <> "href" =: enc r)
   (e, a) <- element elementTag cfg w
-  -- TODO: This should "scrollTo" top automatically if the user is at the bottom of the page
   setRoute $ r <$ domEvent Click e
   return a
+
+scrollToTop :: (Prerender js t m, Monad m) => m ()
+scrollToTop = void $ prerender blank $ do
+  window <- currentWindowUnchecked
+  scrollTo window 0 0
