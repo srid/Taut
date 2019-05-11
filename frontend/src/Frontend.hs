@@ -63,8 +63,8 @@ frontend = Frontend
 
           userE <- fmap switchDyn $ subRoute $ \case
             FrontendRoute_Home -> do
-              examplesE <- getSearchExamples
-              widgetHold_ blank $ ffor examplesE $ \case
+              resp <- getSearchExamples
+              widgetHold_ blank $ ffor resp $ \case
                 Nothing -> text "Unable to load search examples"
                 Just (Left na) -> notAuthorizedWidget na
                 Just (Right (_, examples)) -> do
@@ -77,7 +77,7 @@ frontend = Frontend
                         routeLinkClass r "ui header" $ text query
                         divClass "description" $ text title
                   el "p" blank
-              pure never
+              pure $ fmap fst $ filterRight $ fforMaybe resp id
             FrontendRoute_Search -> do
               r  <- askRoute
               resp <- getMessages r (BackendRoute_SearchMessages :/)
