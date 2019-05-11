@@ -52,14 +52,15 @@ singleMessage msg = do
       elClass "a" "author" $ do
         text $ fromMaybe "?unknown?" $ _messageUserName msg
       -- let r = FrontendRoute_Search :/ (mkPaginatedRouteAtPage1 $ "at:" <> mts)
-      let r = BackendRoute_LocateMessage :/ (_messageTs msg)
       divClass "metadata" $ do
         divClass "room" $
           text $ fromMaybe "Unknown Channel" $ fmap ("#" <>) $ _messageChannelName msg
         divClass "date" $ do
-          -- routeLink r $ text $ T.pack $ show $ _messageTs msg
-          let rr = renderBackendRoute enc r
-          elAttr "a" ("href" =: rr) $ text $ T.pack $ show $ _messageTs msg
+          case _messageChannelName msg of
+            Nothing -> text $ T.pack $ show $ _messageTs msg
+            Just ch -> do
+              let rr = renderBackendRoute enc $ BackendRoute_LocateMessage :/ (ch, _messageTs msg)
+              elAttr "a" ("href" =: rr) $ text $ T.pack $ show $ _messageTs msg
       elAttr "div" ("class" =: "text") $ do
         renderSlackMessage $ _messageText msg
   where

@@ -17,7 +17,6 @@ import Data.Functor.Identity (Identity(..))
 import Data.Maybe (fromMaybe)
 import Data.Monoid ((<>))
 import Data.Text (Text)
-import Data.Time.Clock
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.IO as T
@@ -73,22 +72,22 @@ backend = Backend
                     [ ("Do a basic search", "sunny day")
                     , ("Use quotes for exact match", "\"great day\"")
                     , ("Browse messages on a particular day", "during:2018-8-23")
+                    , ("All messages in #general channel", "in:general")
                     ]
               pure $ Right (u, examples)
           writeLBS $ encode resp
-        BackendRoute_LocateMessage :=> Identity t -> do
-          authorizeUser cfg (renderBackendRoute (_backendConfig_enc cfg) $ BackendRoute_LocateMessage :/ t) >>= \case
+        BackendRoute_LocateMessage :=> Identity (ch, t) -> do
+          authorizeUser cfg (renderBackendRoute (_backendConfig_enc cfg) $ BackendRoute_LocateMessage :/ (ch, t)) >>= \case
             Left e -> redirect $ T.encodeUtf8 $ notAuthorizedLoginLink e
             Right _ -> do
-              let day = utctDay t
-                  mf = allMessages & messageFilters_during .~ [day]
+              let mf = allMessages & messageFilters_in .~ [ch]
               page <- liftIO $ runBeamSqlite (_backendConfig_sqliteConn cfg) $ do
                 total <- countMessages cfg mf
                 after <- countMessages cfg $ mf & messageFilters_at ?~ t
                 let pgSize = fromIntegral $ _backendConfig_pageSize cfg
                 pure $ fromIntegral $ 1 + (toInteger (total - after) `quot` pgSize)
               redirect $ T.encodeUtf8 $ (renderFrontendRoute (_backendConfig_enc cfg) $
-                FrontendRoute_Search :/ PaginatedRoute (page, "during:" <> T.pack (show day))) <> "#" <> (formatSlackTimestamp t)
+                FrontendRoute_Search :/ PaginatedRoute (page, "in:" <> ch)) <> "#" <> (formatSlackTimestamp t)
         BackendRoute_SearchMessages :=> Identity pQuery -> do
           resp :: MessagesResponse <- authorizeUser cfg (renderFrontendRoute (_backendConfig_enc cfg) $ FrontendRoute_Search :/ pQuery) >>= \case
             Left e -> pure $ Left e
