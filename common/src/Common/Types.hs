@@ -11,7 +11,7 @@ import Common.Slack.Types.Search
 type MessagesResponse =
   Either
     NotAuthorized
-    (SlackUser, (MessageFilters, Paginated Message))
+    (SlackUser, Either () (MessageFilters, Paginated Message))
 
 type ExamplesResponse =
   Either

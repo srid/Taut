@@ -96,13 +96,12 @@ backend = Backend
               case parseSearchQuery (paginatedRouteValue pQuery) of
                 Left err -> do
                   liftIO $ putStrLn $ show err
-                  -- TODO: return this error to user
-                  liftIO $ throwString $ "Bad query: " <> show err
+                  pure $ Right (u, Left ())
                 Right q -> do
                   let mf = mkMessageFilters q
                   liftIO $ putStrLn $ show mf
                   msgs <- queryMessages cfg mf $ pagination
-                  pure $ Right (u, (mf, msgs))
+                  pure $ Right $ (u, Right (mf, msgs))
           writeLBS $ encode resp
   }
   where

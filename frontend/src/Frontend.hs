@@ -85,7 +85,11 @@ frontend = Frontend
               widgetHold_ (divClass "ui loading segment" blank) $ ffor resp $ \case
                 Nothing -> text "Something went wrong"
                 Just (Left na) -> notAuthorizedWidget na
-                Just (Right (_, (mf, v))) -> do
+                Just (Right (_, Left ())) -> do
+                  divClass "ui error message" $ do
+                    divClass "header" $ text "Bad search query"
+                    el "p" $ text "Your search query is malformed."
+                Just (Right (_, Right (mf, v))) -> do
                   case Search.isOnlyDuring mf of
                     Nothing -> do
                       elHeader "h2" (text "Results") $ do
