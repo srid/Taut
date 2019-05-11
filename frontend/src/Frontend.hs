@@ -10,8 +10,9 @@
 {-# LANGUAGE TypeApplications #-}
 module Frontend where
 
+import Data.Dependent.Sum (DSum ((:=>)))
+import Data.Functor.Identity (Identity (..))
 import Data.Semigroup ((<>))
-import Data.Text (Text)
 import Data.Time.Calendar
 
 import Reflex.Dom.Core
@@ -48,17 +49,19 @@ frontend = Frontend
         divClass ("ui top attached inverted segment " <> color) $
           elClass "h1" "ui header" $
             routeLink (FrontendRoute_Home :/ ()) $ text "Taut - Slack Archive Viewer"
-        divClass "ui attached segment" $ mdo
+        divClass "ui attached segment" $ do
           divClass ("ui raised segment " <> color) $ divClass "ui icon inverted fluid input" $ do
-            query <- holdDyn "" $ fmap fst userE
+            r <- askRoute
+            let query = ffor r $ \case
+                  FrontendRoute_Home :=> Identity () -> ""
+                  FrontendRoute_Search :=> Identity pr -> paginatedRouteValue pr
             searchInputWidgetWithRoute query $ \q ->
               FrontendRoute_Search :/ (PaginatedRoute (1, q))
-          userE :: Event t (Text, SlackUser) <- fmap switchDyn $ subRoute $ \case
-            FrontendRoute_Home ->
-              pure never
+          userE <- fmap switchDyn $ subRoute $ \case
+            FrontendRoute_Home -> pure never
             FrontendRoute_Search -> do
-              r  :: Dynamic t (PaginatedRoute Text) <- askRoute
-              resp <- getMessages r $ (BackendRoute_SearchMessages :/)
+              r  <- askRoute
+              resp <- getMessages r (BackendRoute_SearchMessages :/)
               widgetHold_ (divClass "ui loading segment" blank) $ ffor resp $ \case
                 Nothing -> text "Something went wrong"
                 Just (Left na) -> notAuthorizedWidget na
@@ -74,10 +77,10 @@ frontend = Frontend
                       routeLink (routeForDay $ addDays (-1) day) $ elClass "button" "ui button" $ text "Prev Day"
                       routeLink (routeForDay $ addDays 1 day) $ elClass "button" "ui button" $ text "Next Day"
                   renderMessagesWithPagination r FrontendRoute_Search v
-              pure $ attachWith (,) (current $ fmap paginatedRouteValue r) $ fmap fst $ filterRight $ fforMaybe resp id
+              pure $ fmap fst $ filterRight $ fforMaybe resp id
           divClass "ui bottom attached secondary segment" $ do
             elAttr "a" ("href" =: "https://github.com/srid/Taut") $ text "Powered by Haskell"
-            widgetHold_ blank $ ffor userE $ \(_, SlackUser name _) ->
+            widgetHold_ blank $ ffor userE $ \(SlackUser name _) ->
               divClass "item" $ text $ "Welcome " <> name
   }
   where

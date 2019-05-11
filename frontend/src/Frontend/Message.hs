@@ -13,7 +13,6 @@ import Data.Maybe (fromMaybe, isJust)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time.Calendar
-import Data.Time.Clock (utctDay)
 import Text.Printf (printf)
 
 import Obelisk.Route.Frontend
@@ -22,6 +21,7 @@ import Reflex.Dom.Core
 import Data.Pagination
 
 import Common.Route
+import Common.Slack.Internal (formatSlackTimestamp)
 import Common.Slack.Types
 import Common.Types
 
@@ -49,10 +49,10 @@ singleMessage msg = do
     divClass "content" $ do
       elClass "a" "author" $ do
         text $ fromMaybe "?unknown?" $ _messageUserName msg
-      let day = utctDay $ _messageTs msg
-          r = routeForDay day -- TODO: Determine page where message lies.
+      let r = FrontendRoute_Search :/ (mkPaginatedRouteAtPage1 $ "at:" <> formatSlackTimestamp (_messageTs msg))
       divClass "metadata" $ do
-        divClass "room" $ text $ fromMaybe "Unknown Channel" $ fmap ("#" <>) $ _messageChannelName msg
+        divClass "room" $
+          text $ fromMaybe "Unknown Channel" $ fmap ("#" <>) $ _messageChannelName msg
         divClass "date" $ do
           routeLink r $ text $ T.pack $ show $ _messageTs msg
       elAttr "div" ("class" =: "text") $ do

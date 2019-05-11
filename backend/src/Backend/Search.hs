@@ -35,6 +35,7 @@ mkMessageFilters = foldl f allMessages
         SearchModifier_From user -> mf & messageFilters_from %~ (user:)
         SearchModifier_In chan -> mf & messageFilters_in %~ (chan:)
         SearchModifier_During day -> mf & messageFilters_during %~ (day:)
+        SearchModifier_At t -> mf & messageFilters_at ?~ t
         SearchModifier_HasPin -> mf & messageFilters_hasPin ?~ ()
 
 messageFilters
@@ -55,6 +56,7 @@ messageFilters mf = filter_ $ \msg -> foldl (&&.) (val_ True) $ catMaybes $
       msgFrom msg <$> mf ^. messageFilters_from
   , maybe Nothing (Just . foldl1 (||.)) $ NEL.nonEmpty $
       msgDuring msg <$> mf ^. messageFilters_during
+  , msgAt msg <$> mf ^. messageFilters_at
   ]
   where
     msgContaining msg q = _messageText msg `like_` val_ ("%" <> q <> "%")
@@ -63,3 +65,4 @@ messageFilters mf = filter_ $ \msg -> foldl (&&.) (val_ True) $ catMaybes $
       where
         fromTs = UTCTime day 0
         toTs = UTCTime (addDays 1 day) 0
+    msgAt msg t = _messageTs msg >=. val_ t
