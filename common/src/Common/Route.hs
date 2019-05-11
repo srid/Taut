@@ -17,7 +17,7 @@ import Control.Monad.Except
 import Data.Functor.Identity
 import Data.Functor.Sum
 import qualified Data.Map as Map
-import Data.Maybe (fromMaybe)
+import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time.Clock
@@ -87,15 +87,15 @@ paginatedEncoder
   => EncoderImpl parse a [Text]
   -> Encoder check parse (PaginatedRoute a) PageName
 paginatedEncoder aEncoderImpl = unsafeMkEncoder $ EncoderImpl
-    { _encoderImpl_decode = \(path, query) -> do
-        a <- _encoderImpl_decode aEncoderImpl path
+    { _encoderImpl_decode = \(p:ps, _query) -> do
+        a <- _encoderImpl_decode aEncoderImpl [p]
         pure $ PaginatedRoute
-          ( fromMaybe 1 $ read . T.unpack <$> join (Map.lookup "p" query)
+          ( fromMaybe 1 $ read . T.unpack <$> listToMaybe ps
           , a
           )
     , _encoderImpl_encode = \(PaginatedRoute (n, a)) ->
-        ( _encoderImpl_encode aEncoderImpl a
-        , if n > 1 then Map.singleton "p" (Just $ T.pack $ show n) else mempty
+        ( _encoderImpl_encode aEncoderImpl a <> (if n > 1 then [T.pack (show n)] else mempty)
+        , mempty
         )
     }
 
