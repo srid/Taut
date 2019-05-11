@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -56,7 +57,19 @@ singleMessage msg = do
         divClass "date" $ do
           routeLink r $ text $ T.pack $ show $ _messageTs msg
       elAttr "div" ("class" =: "text") $ do
-        text $ _messageText msg
+        renderSlackMessage $ _messageText msg
+
+-- TODO: This is not perfect yet.
+renderSlackMessage :: DomBuilder t m => Text -> m ()
+renderSlackMessage s = renderChunks $ T.splitOn "\n" s'
+  where
+    s' = T.replace "&gt;" ">" s
+    renderChunks [] = blank
+    renderChunks chunk@(c:cs) = do
+      -- Blockquote all chunks if >>> is prefix.
+      if | T.isPrefixOf ">>>" c -> forM_ chunk $ el "blockquote" . text
+         | T.isPrefixOf ">" c -> el "blockquote" (text c) >> renderChunks cs
+         | otherwise -> el "p" (text c) >> renderChunks cs
 
 getMessages
   :: (Reflex t, MonadHold t m, PostBuild t m, DomBuilder t m, Prerender js t m)
