@@ -14,6 +14,7 @@ library
                , dependent-sum
                , dependent-sum-template
                , filepath
+               , lens
                , mtl
                , obelisk-oauth-common
                , obelisk-route
@@ -30,5 +31,7 @@ library
     Common.Route
     Common.Slack.Types
     Common.Slack.Types.Auth
+    Common.Slack.Types.Search
     Common.Slack.Internal
+    Common.Types
   ghc-options: -Wall
