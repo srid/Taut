@@ -49,7 +49,7 @@ frontend = Frontend
         divClass ("ui top attached inverted segment " <> themeColor) $
             routeLink (FrontendRoute_Home :/ ()) $
               elClass "h1" "ui inverted header" $ text "Taut - Slack Archive Viewer"
-        divClass "ui attached segment" $ do
+        userE <- divClass "ui attached segment" $ do
           divClass ("ui raised large segment " <> themeColor) $ divClass "ui search" $ do
             divClass "ui icon inverted fluid input" $ do
               r <- askRoute
@@ -62,7 +62,7 @@ frontend = Frontend
               searchInputWidgetWithRoute query $ \q ->
                 FrontendRoute_Search :/ (PaginatedRoute (1, q))
 
-          userE <- fmap switchDyn $ subRoute $ \case
+          fmap switchDyn $ subRoute $ \case
             FrontendRoute_Home -> do
               resp <- getSearchExamples
               widgetHold_ blank $ ffor resp $ \case
@@ -105,10 +105,10 @@ frontend = Frontend
                   divClass "ui horizontal divider" blank
                   renderMessagesWithPagination r FrontendRoute_Search v
               pure $ fmap fst $ filterRight $ fforMaybe resp id
-          divClass "ui bottom attached secondary segment" $ do
-            elAttr "a" ("href" =: "https://github.com/srid/Taut") $ text "Powered by Haskell"
-            widgetHold_ blank $ ffor userE $ \(SlackUser name _) ->
-              divClass "item" $ text $ "Welcome " <> name
+        divClass "ui bottom attached secondary segment" $ do
+          elAttr "a" ("href" =: "https://github.com/srid/Taut") $ text "Powered by Haskell"
+          widgetHold_ blank $ ffor userE $ \(SlackUser name _) ->
+            divClass "item" $ text $ "Welcome " <> name
   }
   where
     notAuthorizedWidget :: DomBuilder t m => NotAuthorized -> m ()

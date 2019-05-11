@@ -35,7 +35,6 @@ import Obelisk.Route hiding (decode, encode)
 
 import Common.Route
 import Common.Slack.Types
-import Common.Slack.Internal
 import Common.Slack.Types.Auth
 import Common.Slack.Types.Search
 import Common.Types
@@ -87,7 +86,7 @@ backend = Backend
                 let pgSize = fromIntegral $ _backendConfig_pageSize cfg
                 pure $ fromIntegral $ 1 + (toInteger (total - after) `quot` pgSize)
               redirect $ T.encodeUtf8 $ (renderFrontendRoute (_backendConfig_enc cfg) $
-                FrontendRoute_Search :/ PaginatedRoute (page, "in:" <> ch)) <> "#" <> (formatSlackTimestamp t)
+                FrontendRoute_Search :/ PaginatedRoute (page, "in:" <> ch)) -- <> "#" <> (formatSlackTimestamp t)
         BackendRoute_SearchMessages :=> Identity pQuery -> do
           resp :: MessagesResponse <- authorizeUser cfg (renderFrontendRoute (_backendConfig_enc cfg) $ FrontendRoute_Search :/ pQuery) >>= \case
             Left e -> pure $ Left e

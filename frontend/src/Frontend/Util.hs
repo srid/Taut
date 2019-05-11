@@ -26,21 +26,22 @@ module Frontend.Util where
 
 import Control.Lens hiding (Bifunctor, bimap, element, universe)
 import Control.Monad
+import Data.Bool (bool)
 import Data.GADT.Compare (GEq)
 import Data.Map (Map)
-import GHC.Natural
 import Data.Proxy
 import Data.Some
-import qualified Data.Text as T
 import Data.Text (Text)
+import qualified Data.Text as T
+import GHC.Natural
 import Prelude
 
 import JSDOM
 import JSDOM.Window
 
+import Data.Pagination
 import Obelisk.Route.Frontend
 import Reflex.Dom
-import Data.Pagination
 
 themeColor :: Text
 themeColor = "green"
@@ -98,23 +99,28 @@ paginationNav
      ( DomBuilder t m
      , RouteToUrl (R route) m
      , SetRoute t (R route) m
+     , PostBuild t m
      )
   => Paginated a
   -> (Natural -> R route)
   -> m ()
 paginationNav p mkRoute = when (hasOtherPages p) $ do
   let idx = pageIndex $ paginatedPagination p
-  divClass ("ui message " <> themeColor) $ do
-    when (hasPrevPage p) $
-      routeLink (mkRoute $ sub1Natural idx) $
-        elClass "button" "ui button" $ text "Prev"
-    text "Page "
-    text $ T.pack $ show idx
-    text " of "
-    text $ T.pack $ show $ paginatedPagesTotal p
-    when (hasNextPage p) $
-      routeLink (mkRoute $ succ idx) $
-        elClass "button" "ui button" $ text "Next"
+  divClass ("ui pagination menu") $ do
+    routeLinkClass (mkRoute $ sub1Natural idx) (bool "disabled item" "item" $ hasPrevPage p) $ text "<"
+    let numToShow = 5
+    when (backwardEllip p numToShow) $ do
+      routeLinkClass (mkRoute 1) "item" $ text "1"
+      divClass "disabled item" $ text "..."
+    forM_ (pageRange p numToShow) $ \ridx -> do
+      if ridx == idx
+        then elClass "a" "item active" $ el "strong" $ text $ T.pack (show idx)
+        else routeLinkClass (mkRoute ridx) "item" $ text $ T.pack (show ridx)
+    when (forwardEllip p numToShow) $ do
+      divClass "disabled item" $ text "..."
+      let total = paginatedPagesTotal p
+      routeLinkClass (mkRoute total) "item" $ text $ T.pack (show total)
+    routeLinkClass (mkRoute $ succ idx) (bool "disabled item" "item" $ hasNextPage p) $ text ">"
   where
     -- Workaround arithmetic underflow bug with a mere `n - 1` or `pred n` in
     -- GHCJS
