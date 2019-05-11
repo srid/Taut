@@ -45,6 +45,7 @@ data BackendRoute :: * -> * where
   -- | Used to handle unparseable routes.
   BackendRoute_Missing :: BackendRoute ()
   BackendRoute_OAuth :: BackendRoute (R OAuth)
+  BackendRoute_GetSearchExamples :: BackendRoute ()
   BackendRoute_SearchMessages :: BackendRoute (PaginatedRoute Text)
 
 data FrontendRoute :: * -> * where
@@ -58,6 +59,7 @@ backendRouteEncoder = handleEncoder (const (InL BackendRoute_Missing :/ ())) $
     InL backendRoute -> case backendRoute of
       BackendRoute_Missing -> PathSegment "missing" $ unitEncoder mempty
       BackendRoute_OAuth -> PathSegment "oauth" oauthRouteEncoder
+      BackendRoute_GetSearchExamples -> PathSegment "get-search-examples" $ unitEncoder mempty
       BackendRoute_SearchMessages -> PathSegment "search-messages" $
         paginatedEncoder textEncoderImpl
     InR obeliskRoute -> obeliskRouteSegment obeliskRoute $ \case

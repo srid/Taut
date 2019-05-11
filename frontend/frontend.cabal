@@ -24,6 +24,7 @@ library
                , string-conv
                , text
                , time
+               , jsaddle-dom
   exposed-modules:
     Frontend
     Frontend.Util
@@ -53,6 +54,7 @@ executable frontend
                , string-conv
                , text
                , time
+               , jsaddle-dom
   --TODO: Make these ghc-options optional
   ghc-options: -threaded
   if os(darwin)

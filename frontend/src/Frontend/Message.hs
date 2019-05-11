@@ -70,6 +70,16 @@ getMessages dr mkUrl = switchHold never <=< dyn $ ffor dr $ \r -> do
   where
     Right (enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute FrontendRoute))) PageName) = checkEncoder backendRouteEncoder
 
+getSearchExamples
+  :: (MonadHold t m, PostBuild t m, Prerender js t m)
+  => m (Event t (Maybe ExamplesResponse))
+getSearchExamples = do
+  fmap switchDyn $ prerender (pure never) $ do
+    pb <- getPostBuild
+    getAndDecode $ (renderBackendRoute enc $ (BackendRoute_GetSearchExamples :/ ())) <$ pb
+  where
+    Right (enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute FrontendRoute))) PageName) = checkEncoder backendRouteEncoder
+
 routeForDay :: Day -> R FrontendRoute
 routeForDay day = FrontendRoute_Search :/ mkPaginatedRouteAtPage1 ("during:" <> showDay day)
 

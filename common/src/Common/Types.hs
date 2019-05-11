@@ -1,5 +1,7 @@
 module Common.Types where
 
+import Data.Text (Text)
+
 import Data.Pagination
 
 import Common.Slack.Types
@@ -10,3 +12,8 @@ type MessagesResponse =
   Either
     NotAuthorized
     (SlackUser, (MessageFilters, Paginated Message))
+
+type ExamplesResponse =
+  Either
+    NotAuthorized
+    (SlackUser, [(Text, Text)])

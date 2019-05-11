@@ -35,6 +35,9 @@ import qualified Data.Text as T
 import Data.Text (Text)
 import Prelude
 
+import JSDOM
+import JSDOM.Window
+
 import Obelisk.Route.Frontend
 import Reflex.Dom
 import Data.Pagination
@@ -139,6 +142,10 @@ routeLink' r elementTag attr w = do
         & elementConfig_eventSpec %~ addEventSpecFlags (Proxy :: Proxy (DomBuilderSpace m)) Click (\_ -> preventDefault)
         & elementConfig_initialAttributes .~ (attr <> "href" =: enc r)
   (e, a) <- element elementTag cfg w
-  -- TODO: This should "scrollTo" top automatically if the user is at the bottom of the page
   setRoute $ r <$ domEvent Click e
   return a
+
+scrollToTop :: (Prerender js t m, Monad m) => m ()
+scrollToTop = void $ prerender blank $ do
+  window <- currentWindowUnchecked
+  scrollTo window 0 0

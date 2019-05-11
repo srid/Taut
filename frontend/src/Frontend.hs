@@ -10,6 +10,7 @@
 {-# LANGUAGE TypeApplications #-}
 module Frontend where
 
+import Control.Monad
 import Data.Dependent.Sum (DSum ((:=>)))
 import Data.Functor.Identity (Identity (..))
 import Data.Semigroup ((<>))
@@ -45,20 +46,41 @@ frontend = Frontend
       elAttr "link" ("rel" =: "stylesheet" <> "type" =: "text/css" <> "href" =: static @"semantic.min.css") blank
   , _frontend_body = do
       divClass "ui container" $ do
-        let color = "teal"
+        let color = "green"
         divClass ("ui top attached inverted segment " <> color) $
-          elClass "h1" "ui header" $
-            routeLink (FrontendRoute_Home :/ ()) $ text "Taut - Slack Archive Viewer"
+            routeLink (FrontendRoute_Home :/ ()) $
+              elClass "h1" "ui inverted header" $ text "Taut - Slack Archive Viewer"
         divClass "ui attached segment" $ do
           divClass ("ui raised segment " <> color) $ divClass "ui icon inverted fluid input" $ do
             r <- askRoute
+            -- NOTE: setRoute should ideally scroll to top automaticlly, but it
+            -- does not so we do it here.
+            widgetHold_ blank $ ffor (updated r) $ const scrollToTop
             let query = ffor r $ \case
                   FrontendRoute_Home :=> Identity () -> ""
                   FrontendRoute_Search :=> Identity pr -> paginatedRouteValue pr
             searchInputWidgetWithRoute query $ \q ->
               FrontendRoute_Search :/ (PaginatedRoute (1, q))
+
           userE <- fmap switchDyn $ subRoute $ \case
-            FrontendRoute_Home -> pure never
+            FrontendRoute_Home -> do
+              examplesE <- getSearchExamples
+              widgetHold_ blank $ ffor examplesE $ \case
+                Nothing -> text "Unable to load search examples"
+                Just (Left na) -> notAuthorizedWidget na
+                Just (Right (_, examples)) -> do
+                  elClass "h2" "ui header" $ do
+                    divClass "content" $ do
+                      text "Search examples"
+                      divClass "sub header" $ text "Begin browsing the archive using these search queries!"
+                  divClass "ui two column centered grid" $ divClass "column" $
+                    divClass "ui list" $ forM_ examples $ \(title, query) -> do
+                      divClass "item" $ divClass "ui piled segment" $ do
+                        let r = FrontendRoute_Search :/ mkPaginatedRouteAtPage1 query
+                        routeLinkClass r "ui header" $ text query
+                        divClass "description" $ text title
+                  el "p" blank
+              pure never
             FrontendRoute_Search -> do
               r  <- askRoute
               resp <- getMessages r (BackendRoute_SearchMessages :/)

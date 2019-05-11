@@ -77,8 +77,6 @@ populateDatabase conn = do
 
   messages <- fmap join $ traverse channelMessages channels
 
-  putStrLn $ "Loading " <> show (length messages) <> " messages into memory "
-
   let userMap = Map.fromList $ flip fmap users $ \u -> (_userId u, _userName u)
   SQLite.withTransaction conn $ do
     -- Create tables
@@ -95,6 +93,8 @@ populateDatabase conn = do
         runInsert $
           insert (_slackMessages slackDb) $
           insertExpressions (mkMessageExpr userMap <$> chunk)
+
+  putStrLn $ "Loaded " <> show (length messages) <> " messages into memory "
   pure team
   where
     mkMessageExpr :: Map Text Text -> Message -> MessageT (QExpr Sqlite s)

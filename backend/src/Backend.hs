@@ -16,6 +16,7 @@ import Data.Foldable (foldl')
 import Data.Functor.Identity (Identity(..))
 import Data.Maybe (fromMaybe)
 import Data.Monoid ((<>))
+import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.IO as T
@@ -58,6 +59,18 @@ backend = Backend
           Just (RedirectUriParams code mstate) -> do
             handleOAuthCallback cfg code
             redirect $ T.encodeUtf8 $ fromMaybe (renderFrontendRoute (_backendConfig_enc cfg) $ FrontendRoute_Home :/ ()) mstate
+        BackendRoute_GetSearchExamples :=> Identity () -> do
+          resp :: ExamplesResponse <- authorizeUser cfg (FrontendRoute_Home :/ ()) >>= \case
+            Left e -> pure $ Left e
+            Right u -> do
+              -- TODO: This should be generic, and dates determined automatically.
+              let examples :: [(Text, Text)] =
+                    [ ("Do a basic search", "sunny day")
+                    , ("Use quotes for exact match", "\"great day\"")
+                    , ("Browse messages on a particular day", "during:2018-8-23")
+                    ]
+              pure $ Right (u, examples)
+          writeLBS $ encode resp
         BackendRoute_SearchMessages :=> Identity pQuery -> do
           resp :: MessagesResponse <- authorizeUser cfg (FrontendRoute_Search :/ pQuery) >>= \case
             Left e -> pure $ Left e
