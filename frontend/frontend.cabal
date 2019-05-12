@@ -10,6 +10,7 @@ library
                , common
                , containers
                , dependent-sum
+               , ghcjs-dom
                , jsaddle
                , lens
                , modern-uri
@@ -40,6 +41,7 @@ executable frontend
                , containers
                , dependent-sum
                , frontend
+               , ghcjs-dom
                , jsaddle
                , lens
                , modern-uri

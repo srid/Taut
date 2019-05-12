@@ -90,10 +90,13 @@ singleMessage highlight msg = do
           case _messageChannelName msg of
             Nothing -> text $ T.pack $ show $ _messageTs msg
             Just ch -> do
-              let rr = FrontendRoute_Search :/ (PaginatedRoute (Right (_messageTs msg), "in:" <> ch))
-              routeLink rr $ text $ T.pack $ show $ _messageTs msg
+              routeLink (permalink ch) $ text $ T.pack $ show $ _messageTs msg
       elAttr "div" ("class" =: "text") $ do
         renderSlackMessage $ _messageText msg
+  where
+    -- A message permalink is a listing of all messages in its channel, with the
+    -- cursor pointing to the message itself.
+    permalink ch = FrontendRoute_Search :/ (PaginatedRoute (Right (_messageTs msg), "in:" <> ch))
 
 -- TODO: This is not perfect yet.
 renderSlackMessage :: DomBuilder t m => Text -> m ()

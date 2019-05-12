@@ -17,9 +17,10 @@ import Data.Semigroup ((<>))
 import qualified Data.Text as T
 import Data.Time.Calendar
 
-import JSDOM (currentWindowUnchecked)
-import JSDOM.Element (scrollIntoView)
-import JSDOM.Window (scrollTo)
+import GHCJS.DOM (currentWindowUnchecked)
+import GHCJS.DOM.Element (scrollIntoView)
+import GHCJS.DOM.Window (scrollTo)
+
 import Reflex.Dom.Core
 
 import Obelisk.Frontend
