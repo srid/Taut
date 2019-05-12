@@ -61,12 +61,12 @@ frontend = Frontend
                     FrontendRoute_Home :=> Identity () -> ""
                     FrontendRoute_Search :=> Identity pr -> paginatedRouteValue pr
               searchInputWidgetWithRoute query $ \q ->
-                FrontendRoute_Search :/ (PaginatedRoute (1, T.strip q))
+                FrontendRoute_Search :/ (mkPaginatedRouteAtPage1 $ T.strip q)
 
           fmap switchDyn $ subRoute $ \case
             FrontendRoute_Home -> do
               resp <- getSearchExamples
-              widgetHold_ blank $ ffor resp $ \case
+              widgetHold_ loader $ ffor resp $ \case
                 Nothing -> text "Unable to load search examples"
                 Just (Left na) -> notAuthorizedWidget na
                 Just (Right (_, examples)) -> do
@@ -83,7 +83,7 @@ frontend = Frontend
             FrontendRoute_Search -> do
               r  <- askRoute
               resp <- getMessages r (BackendRoute_SearchMessages :/)
-              widgetHold_ (divClass "ui loading segment" blank) $ ffor resp $ \case
+              widgetHold_ loader $ ffor resp $ \case
                 Nothing -> text "Something went wrong"
                 Just (Left na) -> notAuthorizedWidget na
                 Just (Right (_, Left ())) -> do
@@ -116,6 +116,9 @@ frontend = Frontend
             divClass "item" $ text $ "Welcome " <> name
   }
   where
+    loader :: DomBuilder t m => m ()
+    loader = divClass "ui loading segment" blank
+
     notAuthorizedWidget :: DomBuilder t m => NotAuthorized -> m ()
     notAuthorizedWidget = \case
       NotAuthorized_RequireLogin grantHref -> divClass "ui segment" $ do
@@ -130,5 +133,5 @@ frontend = Frontend
 
     renderMessagesWithPagination r mkR pm = do
       let pageW = dyn_ $ ffor r $ \pr ->
-            paginationNav pm $ \p' -> mkR :/ (PaginatedRoute (p', paginatedRouteValue pr))
+            paginationNav pm $ \p' -> mkR :/ (PaginatedRoute (Left p', paginatedRouteValue pr))
       pageW >> messageList pm >> pageW

@@ -20,6 +20,7 @@ import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time.Clock
+import qualified Data.Map as Map
 import GHC.Natural
 
 import Obelisk.OAuth.Authorization
@@ -29,16 +30,18 @@ import Obelisk.Route.TH
 import Common.Slack.Internal
 
 
-newtype PaginatedRoute a = PaginatedRoute { unPaginatedRoute ::  (Natural, a) }
+newtype PaginatedRoute cursor a = PaginatedRoute
+  { unPaginatedRoute ::  (Either Natural cursor, a)
+  }
   deriving (Eq, Show, Ord)
 
-mkPaginatedRouteAtPage1 :: a -> PaginatedRoute a
-mkPaginatedRouteAtPage1 = PaginatedRoute . (1, )
+mkPaginatedRouteAtPage1 :: a -> PaginatedRoute cursor a
+mkPaginatedRouteAtPage1 = PaginatedRoute . (Left 1, )
 
-paginatedRoutePageIndex :: PaginatedRoute a -> Natural
-paginatedRoutePageIndex = fst . unPaginatedRoute
+paginatedRouteCursor :: PaginatedRoute cursor a -> Either Natural cursor
+paginatedRouteCursor = fst . unPaginatedRoute
 
-paginatedRouteValue :: PaginatedRoute a -> a
+paginatedRouteValue :: PaginatedRoute cursor a -> a
 paginatedRouteValue = snd . unPaginatedRoute
 
 data BackendRoute :: * -> * where
@@ -46,12 +49,11 @@ data BackendRoute :: * -> * where
   BackendRoute_Missing :: BackendRoute ()
   BackendRoute_OAuth :: BackendRoute (R OAuth)
   BackendRoute_GetSearchExamples :: BackendRoute ()
-  BackendRoute_LocateMessage :: BackendRoute (Text, UTCTime) -- Channel and timestamp
-  BackendRoute_SearchMessages :: BackendRoute (PaginatedRoute Text)
+  BackendRoute_SearchMessages :: BackendRoute (PaginatedRoute UTCTime Text)
 
 data FrontendRoute :: * -> * where
   FrontendRoute_Home :: FrontendRoute ()
-  FrontendRoute_Search :: FrontendRoute (PaginatedRoute Text)
+  FrontendRoute_Search :: FrontendRoute (PaginatedRoute UTCTime Text)
 
 backendRouteEncoder
   :: Encoder (Either Text) Identity (R (Sum BackendRoute (ObeliskRoute FrontendRoute))) PageName
@@ -61,44 +63,53 @@ backendRouteEncoder = handleEncoder (const (InL BackendRoute_Missing :/ ())) $
       BackendRoute_Missing -> PathSegment "missing" $ unitEncoder mempty
       BackendRoute_OAuth -> PathSegment "oauth" oauthRouteEncoder
       BackendRoute_GetSearchExamples -> PathSegment "get-search-examples" $ unitEncoder mempty
-      BackendRoute_LocateMessage -> PathSegment "locate-message" locateMessageEncoder
       BackendRoute_SearchMessages -> PathSegment "search-messages" $
-        paginatedEncoder textEncoderImpl
+        paginatedEncoder utcTimeEncoderImpl textEncoderImpl
     InR obeliskRoute -> obeliskRouteSegment obeliskRoute $ \case
       -- The encoder given to PathEnd determines how to parse query parameters,
       -- in this example, we have none, so we insist on it.
       FrontendRoute_Home -> PathEnd $ unitEncoder mempty
       FrontendRoute_Search -> PathSegment "search" $
-        paginatedEncoder textEncoderImpl
+        paginatedEncoder utcTimeEncoderImpl textEncoderImpl
 
 -- TODO: compose instead of writing by hand
-locateMessageEncoder
-  :: (Applicative check, MonadError Text parse)
-  => Encoder check parse (Text, UTCTime) PageName
-locateMessageEncoder = unsafeMkEncoder $ EncoderImpl
-  { _encoderImpl_decode = \([ch, t], _query) -> do
-      (ch,) <$> parseSlackTimestamp t
-  , _encoderImpl_encode = \(ch, t) -> ([ch, formatSlackTimestamp t], mempty)
-  }
-
 paginatedEncoder
   :: (Applicative check, MonadError Text parse)
-  => EncoderImpl parse a [Text]
-  -> Encoder check parse (PaginatedRoute a) PageName
-paginatedEncoder aEncoderImpl = unsafeMkEncoder $ EncoderImpl
-    { _encoderImpl_decode = \(p:ps, _query) -> do
+  => EncoderImpl parse (Maybe cursor) [Text]
+  -> EncoderImpl parse a [Text]
+  -> Encoder check parse (PaginatedRoute cursor a) PageName
+paginatedEncoder cursorEncoderImpl aEncoderImpl = unsafeMkEncoder $ EncoderImpl
+    { _encoderImpl_decode = \(p:ps, query) -> do
+        mcursor <- _encoderImpl_decode cursorEncoderImpl ps
         a <- _encoderImpl_decode aEncoderImpl [p]
-        pure $ PaginatedRoute
-          ( fromMaybe 1 $ read . T.unpack <$> listToMaybe ps
-          , a
-          )
-    , _encoderImpl_encode = \(PaginatedRoute (n, a)) ->
-        ( _encoderImpl_encode aEncoderImpl a <> (if n > 1 then [T.pack (show n)] else mempty)
-        , mempty
+        case mcursor of
+          Nothing -> pure $ PaginatedRoute
+            ( Left $ fromMaybe 1 $ fmap (read . T.unpack) =<< Map.lookup "p" query
+            , a
+            )
+          Just cursor -> pure $ PaginatedRoute
+            ( Right cursor
+            , a
+            )
+    , _encoderImpl_encode = \(PaginatedRoute (nc, a)) ->
+        ( _encoderImpl_encode aEncoderImpl a <> (either mempty (_encoderImpl_encode cursorEncoderImpl . Just) nc)
+        , either (Map.singleton "p" . Just . T.pack . show) mempty nc
         )
     }
 
--- TODO: shouldn't need this.
+-- TODO: shouldn't need the Impl implementations with
+-- https://github.com/obsidiansystems/obelisk/pull/426/files
+utcTimeEncoderImpl
+  :: (MonadError Text parse)
+  => EncoderImpl parse (Maybe UTCTime) [Text]
+utcTimeEncoderImpl = EncoderImpl
+  { _encoderImpl_decode = \ps -> case ps of
+      [] -> pure Nothing
+      [t] -> Just <$> parseSlackTimestamp t
+      _ -> throwError "More than 1 path element for utcTimeEncoderImpl"
+  , _encoderImpl_encode = \mt -> (maybe [] (pure . formatSlackTimestamp) mt)
+  }
+
 textEncoderImpl
   :: (MonadError Text parse)
   => EncoderImpl parse Text [Text]

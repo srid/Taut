@@ -5,6 +5,8 @@
 - Fix extra space around search query breaking app
 - Read directly from the Zip archive
 - Add `after:` and `before:` to search query
+- Message permalinks no longer have page numbers in their URL, and are thus
+  "permanent".
 
 ## v0.2 - 2019/05/11
 
