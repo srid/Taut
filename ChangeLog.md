@@ -4,6 +4,7 @@
 
 - Fix extra space around search query breaking app
 - Read directly from the Zip archive
+- Add `after:` and `before:` to search query
 
 ## v0.2 - 2019/05/11
 

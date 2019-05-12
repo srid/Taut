@@ -73,6 +73,8 @@ backend = Backend
                     , ("Browse messages on a particular day", "during:2018-8-23")
                     , ("All messages in #general channel", "in:general")
                     , ("Messages by Andrew in #random channel", "in:random from:andrew")
+                    , ("Messages in #general after August 2018", "after:2018-08-01 in:general")
+                    , ("Messages in #random during mid 2016", "after:2016-08-01 before:2016-09-01 in:random")
                     ]
               pure $ Right (u, examples)
           writeLBS $ encode resp

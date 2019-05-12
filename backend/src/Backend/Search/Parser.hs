@@ -29,8 +29,8 @@ data SearchModifier
   | SearchModifier_In Text  -- ^ In channel
   | SearchModifier_During Day
   | SearchModifier_At UTCTime  -- ^ At a specific message
-  -- | SearchModifier_Before Day
-  -- | SearchModifier_After Day
+  | SearchModifier_After Day
+  | SearchModifier_Before Day
   | SearchModifier_HasPin
   -- | HasLink
   -- | HasEmoji EmojiCode
@@ -43,17 +43,18 @@ type Parser = Parsec Void Text
 
 searchModifier :: Parser SearchModifier
 searchModifier =
-      try (SearchModifier_From <$> attribute "from")
-  <|> try (SearchModifier_In <$> attribute "in")
-  <|>     (SearchModifier_During <$> dayParser)
-  <|>     (SearchModifier_At <$> timeParser)
+      try (SearchModifier_From <$> (attribute "from" >> someWord))
+  <|> try (SearchModifier_In <$> (attribute "in" >> someWord))
+  <|>     (SearchModifier_During <$> (try (attribute "during") >> dayParser))
+  <|>     (SearchModifier_At <$> (try (attribute "at") >> timeParser))
+  <|>     (SearchModifier_After <$> (try (attribute "after") >> dayParser))
+  <|>     (SearchModifier_Before <$> (try (attribute "before") >> dayParser))
   <|> try (SearchModifier_HasPin <$ string "has:pin")
 
 dayParser :: Parser Day
 dayParser = do
   let parseNum :: Read a => String -> Parser a
       parseNum e = maybe (fail e :: Parser a) pure =<< fmap readMaybe (some digitChar)
-  void $ try $ string "during:"
   year :: Integer <- parseNum "Expected year"
   _ <- string "-"
   month :: Int <- parseNum "Expected month"
@@ -63,7 +64,6 @@ dayParser = do
 
 timeParser :: Parser UTCTime
 timeParser = do
-  void $ try $ string "at:"
   ts :: Integer <- L.decimal
   parseSlackTimestamp $ T.pack (show ts)
 
@@ -83,10 +83,8 @@ quotedText = do
 someWord :: Parser Text
 someWord = T.pack <$> some alphaNumChar -- TODO: Review the accuracy of this
 
-attribute :: Text -> Parser Text
-attribute name = do
-  void $ string $ name <> ":"
-  T.pack <$> some alphaNumChar
+attribute :: Text -> Parser ()
+attribute name = void $ string $ name <> ":"
 
 parseSearchQuery :: Text -> Either (ParseError Char Void) [Either SearchModifier SearchKeyword]
 parseSearchQuery q = runParser p "<user-query>" q

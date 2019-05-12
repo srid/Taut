@@ -23,6 +23,8 @@ data MessageFilters = MessageFilters
   , _messageFilters_from :: [Text]
   , _messageFilters_in :: [Text]
   , _messageFilters_during :: [Day]
+  , _messageFilters_after :: Maybe Day
+  , _messageFilters_before :: Maybe Day
   , _messageFilters_at :: Maybe UTCTime
   , _messageFilters_hasPin :: Maybe ()
   }
@@ -34,7 +36,7 @@ instance FromJSON MessageFilters
 instance ToJSON MessageFilters
 
 allMessages :: MessageFilters
-allMessages = MessageFilters [] [] [] [] Nothing Nothing
+allMessages = MessageFilters [] [] [] [] Nothing Nothing Nothing Nothing
 
 isOnlyDuring :: MessageFilters -> Maybe Day
 isOnlyDuring mf = do

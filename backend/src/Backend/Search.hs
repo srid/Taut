@@ -35,6 +35,8 @@ mkMessageFilters = foldl f allMessages
         SearchModifier_From user -> mf & messageFilters_from %~ (user:)
         SearchModifier_In chan -> mf & messageFilters_in %~ (chan:)
         SearchModifier_During day -> mf & messageFilters_during %~ (day:)
+        SearchModifier_After day -> mf & messageFilters_after ?~ day
+        SearchModifier_Before day -> mf & messageFilters_before ?~ day
         SearchModifier_At t -> mf & messageFilters_at ?~ t
         SearchModifier_HasPin -> mf & messageFilters_hasPin ?~ ()
 
@@ -59,13 +61,17 @@ messageFilters mf = filter_ $ \msg -> foldl (&&.) (val_ True) $ catMaybes $
   , maybe Nothing (Just . foldl1 (||.)) $ NEL.nonEmpty $
       msgInChannel msg <$> mf ^. messageFilters_in
   , msgAt msg <$> mf ^. messageFilters_at
+  , msgAfter msg <$> mf ^. messageFilters_after
+  , msgBefore msg <$> mf ^. messageFilters_before
   ]
   where
     msgContaining msg q = _messageText msg `like_` val_ ("%" <> q <> "%")
     msgFrom msg (user :: Text) = _messageUserName msg ==. just_ (val_ user)
     msgInChannel msg (ch :: Text) = _messageChannelName msg ==. just_ (val_ ch)
-    msgDuring msg day = _messageTs msg >=. val_ fromTs &&. _messageTs msg <. val_ toTs
-      where
-        fromTs = UTCTime day 0
-        toTs = UTCTime (addDays 1 day) 0
+    msgDuring msg day = _messageTs msg >=. val_ (dayStart day) &&. _messageTs msg <. val_ (dayEnd day)
     msgAt msg t = _messageTs msg >=. val_ t
+    msgAfter msg day = _messageTs msg >=. val_ (dayStart day)
+    msgBefore msg day = _messageTs msg <=. val_ (dayEnd day)
+
+    dayStart day = UTCTime day 0
+    dayEnd day = UTCTime (addDays 1 day) 0
