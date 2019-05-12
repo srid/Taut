@@ -36,9 +36,6 @@ import qualified Data.Text as T
 import GHC.Natural
 import Prelude
 
-import JSDOM
-import JSDOM.Window
-
 import Data.Pagination
 import Obelisk.Route.Frontend
 import Reflex.Dom
@@ -159,8 +156,3 @@ routeLink' r elementTag attr w = do
   (e, a) <- element elementTag cfg w
   setRoute $ r <$ domEvent Click e
   return a
-
-scrollToTop :: (Prerender js t m, Monad m) => m ()
-scrollToTop = void $ prerender blank $ do
-  window <- currentWindowUnchecked
-  scrollTo window 0 0

@@ -17,7 +17,9 @@ import Data.Semigroup ((<>))
 import qualified Data.Text as T
 import Data.Time.Calendar
 
-import qualified JSDOM.Element as DOM
+import JSDOM (currentWindowUnchecked)
+import JSDOM.Element (scrollIntoView)
+import JSDOM.Window (scrollTo)
 import Reflex.Dom.Core
 
 import Obelisk.Frontend
@@ -56,9 +58,9 @@ frontend = Frontend
         highlightE <- delay 0.2 $ updated highlight
         void $ prerender blank $ widgetHold_ blank $ ffor highlightE $ \case
           Nothing ->
-            scrollToTop
+            currentWindowUnchecked >>= \w -> scrollTo w 0 0
           Just e ->
-            DOM.scrollIntoView (_element_raw e) True
+            scrollIntoView (_element_raw e) True
 
         highlight :: Dynamic t (Maybe (Element EventResult GhcjsDomSpace t)) <- divClass "ui attached segment" $ do
           divClass ("ui raised large segment " <> themeColor) $ divClass "ui search" $ do
@@ -121,7 +123,8 @@ frontend = Frontend
                         text " day."
                   divClass "ui horizontal divider" blank
                   let msgRef = either (const Nothing) Just $ paginatedRouteCursor pr
-                  renderMessagesWithPagination r FrontendRoute_Search v msgRef
+                      pageNav = paginationNav v $ \p' -> FrontendRoute_Search :/ (PaginatedRoute (Left p', paginatedRouteValue pr))
+                  pageNav *> messageList msgRef v <* pageNav
         divClass "ui bottom attached secondary segment" $ do
           elAttr "a" ("href" =: "https://github.com/srid/Taut") $ text "Powered by Haskell"
   }
@@ -140,11 +143,3 @@ frontend = Frontend
       where
         slackLoginButton r = elAttr "a" ("href" =: r) $
           elAttr "img" ("src" =: "https://api.slack.com/img/sign_in_with_slack.png") blank
-
-    renderMessagesWithPagination r mkR pm h = do
-      let pageW = dyn_ $ ffor r $ \pr ->
-            paginationNav pm $ \p' -> mkR :/ (PaginatedRoute (Left p', paginatedRouteValue pr))
-      pageW
-      e <- messageList h pm
-      pageW
-      pure e
