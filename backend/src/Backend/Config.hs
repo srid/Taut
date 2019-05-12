@@ -9,22 +9,22 @@
 module Backend.Config where
 
 import Control.Exception.Safe (Exception, throwIO)
-import Data.Text (Text)
-import Data.Functor.Sum
 import Data.Functor.Identity (Identity)
-import GHC.Natural (Natural)
+import Data.Functor.Sum
+import Data.Text (Text)
 import qualified Data.Text as T
+import GHC.Natural (Natural)
 
+import qualified Database.SQLite.Simple as SQLite
 import Network.HTTP.Client
 import Network.HTTP.Client.TLS
 import Web.ClientSession
-import qualified Database.SQLite.Simple as SQLite
 
-import Obelisk.Route hiding (decode, encode)
 import qualified Obelisk.ExecutableConfig as Cfg
+import Obelisk.Route hiding (decode, encode)
 
 import Common.Route
-import Common.Slack.Types.Auth (SlackTeam(..))
+import Common.Slack.Types.Auth (SlackTeam (..))
 
 data BackendConfig = BackendConfig
   { _backendConfig_enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute FrontendRoute))) PageName
@@ -36,6 +36,7 @@ data BackendConfig = BackendConfig
   , _backendConfig_routeEnv :: Text
   , _backendConfig_oauthClientID :: Text  -- TODO: invariant for oauth format?
   , _backendConfig_oauthClientSecret :: Text
+  , _backendConfig_slackExportPath :: Text
   }
 
 data InvalidConfig
@@ -55,6 +56,7 @@ readBackendConfig conn team = BackendConfig enc
   <*> getConfigNonEmpty "config/common/route"
   <*> getConfigNonEmpty "config/backend/oauthClientID"
   <*> getConfigNonEmpty "config/backend/oauthClientSecret"
+  <*> getSlackExportPath
   where
     Right (enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute FrontendRoute))) PageName) = checkEncoder backendRouteEncoder
     -- WARNING: Changing the default page size will invalidate existing message
@@ -64,8 +66,13 @@ readBackendConfig conn team = BackendConfig enc
     -- ?afterTs or some such thing, while making sure frontend page navigation
     -- is still possible.
     defaultPageSize = 30
-    getConfigNonEmpty p = Cfg.get p >>= \case
-      Nothing -> throwIO $ InvalidConfig_Missing p
-      Just v' -> do
-        let v = T.strip v'
-        if T.null v then throwIO (InvalidConfig_Empty p) else pure v
+
+getSlackExportPath :: IO Text
+getSlackExportPath = getConfigNonEmpty "config/backend/slackExportPath"
+
+getConfigNonEmpty :: Text -> IO Text
+getConfigNonEmpty p = Cfg.get p >>= \case
+  Nothing -> throwIO $ InvalidConfig_Missing p
+  Just v' -> do
+    let v = T.strip v'
+    if T.null v then throwIO (InvalidConfig_Empty p) else pure v

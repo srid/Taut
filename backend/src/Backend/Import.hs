@@ -31,10 +31,6 @@ import qualified Database.SQLite.Simple as SQLite
 import Common.Slack.Types
 import Common.Slack.Types.Auth (SlackTeam (..))
 
--- TODO: This should come from config file
-archivePath :: FilePath
-archivePath = "/home/srid/Downloads/ActualFreedom Slack export Jul 10 2016 - May 10 2019.zip"
-
 data SlackDb f = SlackDb
   { _slackChannels :: f (TableEntity ChannelT)
   , _slackUsers :: f (TableEntity UserT)
@@ -51,11 +47,12 @@ loadFromArchive :: FromJSON a => EntrySelector -> ZipArchive a
 loadFromArchive = either error pure . eitherDecode <=< fmap BL.fromStrict . getEntry
 
 channelMessages :: Channel -> ZipArchive [Message]
-channelMessages channel = fmap setChannel <$> (msgFiles >>= fmap join . traverse loadFromArchive)
+channelMessages channel =
+  fmap setChannel <$> (msgFiles >>= fmap join . traverse loadFromArchive)
   where
     msgFiles = do
       let c = _channelName channel
-      entries <- withArchive archivePath (Map.keys <$> getEntries)
+      entries <- Map.keys <$> getEntries
       pure $ flip filter entries $ \e ->
         let name = getEntryName e in T.isPrefixOf (c <> "/") name && T.isSuffixOf ".json" name
     setChannel msg = msg  { _messageChannelName = Just $ _channelName channel }
@@ -67,9 +64,9 @@ schema =
   , "CREATE TABLE messages (id INTEGER PRIMARY KEY, type VARCHAR NOT NULL, subtype VARCHAR, user VARCHAR, user_name VARCHAR, bot_id VARCHAR, text VARCHAR NOT NULL, client_msg_id VARCHAR, ts INT NOT NULL, channel_name VARCHAR);"
   ]
 
-populateDatabase :: SQLite.Connection -> IO SlackTeam
-populateDatabase conn = do
-  (users, channels, messages) <- withArchive archivePath $ do
+populateDatabase :: SQLite.Connection -> Text -> IO SlackTeam
+populateDatabase conn archivePath = do
+  (users, channels, messages) <- withArchive (T.unpack archivePath) $ do
     users :: [User] <- loadFromArchive =<< mkEntrySelector "users.json"
     channels :: [Channel] <- loadFromArchive =<< mkEntrySelector "channels.json"
     messages <- fmap join $ traverse channelMessages channels

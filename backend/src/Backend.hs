@@ -50,7 +50,7 @@ backend :: Backend BackendRoute FrontendRoute
 backend = Backend
   { _backend_routeEncoder = backendRouteEncoder
   , _backend_run = \serve -> SQLite.withConnection "" $ \conn -> do
-      team <- liftIO $ populateDatabase conn
+      team <- liftIO $ populateDatabase conn =<< getSlackExportPath
       cfg <- readBackendConfig conn team
       liftIO $ T.putStrLn $ "routeEnv: " <> _backendConfig_routeEnv cfg
 

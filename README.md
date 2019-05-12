@@ -17,4 +17,7 @@ Slack community I help manage.
 ## Running
 
 1. Install [obelisk](https://github.com/obsidiansystems/obelisk)
-2. Clone this repo, and run `ob run`
+1. Appropriately configure the app by changing `config/backend/*`
+  - You will need your Slack OAuth keys
+  - And specify the path to your Slack export zip file.
+1. Clone this repo, and run `ob run`
