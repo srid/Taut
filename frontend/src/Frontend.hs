@@ -55,8 +55,7 @@ frontend = Frontend
             routeLink (FrontendRoute_Home :/ ()) $
               elClass "h1" "ui inverted header" $ text "Taut - Slack Archive Viewer"
 
-        -- Autoscroll
-        highlightE <- delay 0.2 $ updated highlight
+        highlightE <- delay 0.2 $ updated highlight  -- Delay until DOM is ready.
         void $ prerender blank $ widgetHold_ blank $ ffor highlightE $ \case
           Nothing ->
             currentWindowUnchecked >>= \w -> scrollTo w 0 0
