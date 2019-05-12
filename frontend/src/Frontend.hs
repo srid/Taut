@@ -61,7 +61,7 @@ frontend = Frontend
                     FrontendRoute_Home :=> Identity () -> ""
                     FrontendRoute_Search :=> Identity pr -> paginatedRouteValue pr
               searchInputWidgetWithRoute query $ \q ->
-                FrontendRoute_Search :/ (PaginatedRoute (1, T.strip q))
+                FrontendRoute_Search :/ (PaginatedRoute (Left 1, T.strip q))
 
           fmap switchDyn $ subRoute $ \case
             FrontendRoute_Home -> do
@@ -130,5 +130,5 @@ frontend = Frontend
 
     renderMessagesWithPagination r mkR pm = do
       let pageW = dyn_ $ ffor r $ \pr ->
-            paginationNav pm $ \p' -> mkR :/ (PaginatedRoute (p', paginatedRouteValue pr))
+            paginationNav pm $ \p' -> mkR :/ (PaginatedRoute (Left p', paginatedRouteValue pr))
       pageW >> messageList pm >> pageW

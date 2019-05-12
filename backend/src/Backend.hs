@@ -83,18 +83,13 @@ backend = Backend
             Left e -> redirect $ T.encodeUtf8 $ notAuthorizedLoginLink e
             Right _ -> do
               let mf = def & messageFilters_in .~ [ch]
-              page <- liftIO $ runBeamSqlite (_backendConfig_sqliteConn cfg) $ do
-                total <- countMessages cfg mf
-                after <- countMessages cfg $ mf & messageFilters_at ?~ t
-                let pgSize = fromIntegral $ _backendConfig_pageSize cfg
-                pure $ fromIntegral $ 1 + (toInteger (total - after) `quot` pgSize)
+              page <- locateMessage cfg mf t
               redirect $ T.encodeUtf8 $ (renderFrontendRoute (_backendConfig_enc cfg) $
-                FrontendRoute_Search :/ PaginatedRoute (page, "in:" <> ch)) -- <> "#" <> (formatSlackTimestamp t)
+                FrontendRoute_Search :/ PaginatedRoute (Left page, "in:" <> ch)) -- <> "#" <> (formatSlackTimestamp t)
         BackendRoute_SearchMessages :=> Identity pQuery -> do
           resp :: MessagesResponse <- authorizeUser cfg (renderFrontendRoute (_backendConfig_enc cfg) $ FrontendRoute_Search :/ pQuery) >>= \case
             Left e -> pure $ Left e
             Right u -> do
-              pagination <- liftIO $ mkPaginationFromRoute cfg pQuery
               case parseSearchQuery (paginatedRouteValue pQuery) of
                 Left err -> do
                   liftIO $ putStrLn $ show err
@@ -102,12 +97,22 @@ backend = Backend
                 Right q -> do
                   let mf = mkMessageFilters q
                   liftIO $ putStrLn $ show mf
+                  pagination <- liftIO $ mkPaginationFromRoute cfg mf pQuery
                   msgs <- queryMessages cfg mf $ pagination
                   pure $ Right $ (u, Right (mf, msgs))
           writeLBS $ encode resp
   }
   where
-    mkPaginationFromRoute cfg p = mkPagination (_backendConfig_pageSize cfg) (paginatedRoutePageIndex p)
+    mkPaginationFromRoute cfg mf p = mkPagination (_backendConfig_pageSize cfg) =<< case paginatedRouteCursor p of
+      Left pg -> pure pg
+      Right t -> locateMessage cfg mf t
+
+    locateMessage cfg mf t = do
+      liftIO $ runBeamSqlite (_backendConfig_sqliteConn cfg) $ do
+        total <- countMessages cfg mf
+        after <- countMessages cfg $ mf & messageFilters_at ?~ t
+        let pgSize = fromIntegral $ _backendConfig_pageSize cfg
+        pure $ fromIntegral $ 1 + (toInteger (total - after) `quot` pgSize)
 
     countMessages cfg mf = do
       liftIO $ runBeamSqlite (_backendConfig_sqliteConn cfg) $ do

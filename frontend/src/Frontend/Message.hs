@@ -48,7 +48,7 @@ singleMessage msg = do
           case _messageChannelName msg of
             Nothing -> text $ T.pack $ show $ _messageTs msg
             Just ch -> do
-              let rr = renderBackendRoute enc $ BackendRoute_LocateMessage :/ (ch, _messageTs msg)
+              let rr = renderFrontendRoute enc $ FrontendRoute_Search :/ (PaginatedRoute (Right (_messageTs msg), "in:" <> ch))
               elAttr "a" ("href" =: rr) $ text $ T.pack $ show $ _messageTs msg
       elAttr "div" ("class" =: "text") $ do
         renderSlackMessage $ _messageText msg
