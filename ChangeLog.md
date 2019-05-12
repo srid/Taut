@@ -1,5 +1,9 @@
 # Taut revision history
 
+## Unreleased
+
+- Fix extra space around search query breaking app
+
 ## v0.2 - 2019/05/11
 
 - Improved search, based Slack's query format. Search for exact phrase, and filter by user, date and channel.
