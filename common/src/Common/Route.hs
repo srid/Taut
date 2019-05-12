@@ -49,7 +49,6 @@ data BackendRoute :: * -> * where
   BackendRoute_Missing :: BackendRoute ()
   BackendRoute_OAuth :: BackendRoute (R OAuth)
   BackendRoute_GetSearchExamples :: BackendRoute ()
-  BackendRoute_LocateMessage :: BackendRoute (Text, UTCTime) -- Channel and timestamp
   BackendRoute_SearchMessages :: BackendRoute (PaginatedRoute UTCTime Text)
 
 data FrontendRoute :: * -> * where
@@ -64,7 +63,6 @@ backendRouteEncoder = handleEncoder (const (InL BackendRoute_Missing :/ ())) $
       BackendRoute_Missing -> PathSegment "missing" $ unitEncoder mempty
       BackendRoute_OAuth -> PathSegment "oauth" oauthRouteEncoder
       BackendRoute_GetSearchExamples -> PathSegment "get-search-examples" $ unitEncoder mempty
-      BackendRoute_LocateMessage -> PathSegment "locate-message" locateMessageEncoder
       BackendRoute_SearchMessages -> PathSegment "search-messages" $
         paginatedEncoder utcTimeEncoderImpl textEncoderImpl
     InR obeliskRoute -> obeliskRouteSegment obeliskRoute $ \case
@@ -75,15 +73,6 @@ backendRouteEncoder = handleEncoder (const (InL BackendRoute_Missing :/ ())) $
         paginatedEncoder utcTimeEncoderImpl textEncoderImpl
 
 -- TODO: compose instead of writing by hand
-locateMessageEncoder
-  :: (Applicative check, MonadError Text parse)
-  => Encoder check parse (Text, UTCTime) PageName
-locateMessageEncoder = unsafeMkEncoder $ EncoderImpl
-  { _encoderImpl_decode = \([ch, t], _query) -> do
-      (ch,) <$> parseSlackTimestamp t
-  , _encoderImpl_encode = \(ch, t) -> ([ch, formatSlackTimestamp t], mempty)
-  }
-
 paginatedEncoder
   :: (Applicative check, MonadError Text parse)
   => EncoderImpl parse (Maybe cursor) [Text]

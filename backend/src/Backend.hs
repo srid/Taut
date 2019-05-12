@@ -11,7 +11,6 @@ import Control.Arrow ((&&&))
 import Control.Exception.Safe (throwString)
 import Control.Lens
 import Data.Aeson
-import Data.Default (def)
 import Data.Dependent.Sum (DSum ((:=>)))
 import Data.Foldable (foldl')
 import Data.Functor.Identity (Identity (..))
@@ -35,7 +34,6 @@ import Obelisk.Route hiding (decode, encode)
 
 import Common.Route
 import Common.Slack.Types
-import Common.Slack.Types.Auth
 import Common.Slack.Types.Search
 import Common.Types
 
@@ -78,14 +76,6 @@ backend = Backend
                     ]
               pure $ Right (u, examples)
           writeLBS $ encode resp
-        BackendRoute_LocateMessage :=> Identity (ch, t) -> do
-          authorizeUser cfg (renderBackendRoute (_backendConfig_enc cfg) $ BackendRoute_LocateMessage :/ (ch, t)) >>= \case
-            Left e -> redirect $ T.encodeUtf8 $ notAuthorizedLoginLink e
-            Right _ -> do
-              let mf = def & messageFilters_in .~ [ch]
-              page <- locateMessage cfg mf t
-              redirect $ T.encodeUtf8 $ (renderFrontendRoute (_backendConfig_enc cfg) $
-                FrontendRoute_Search :/ PaginatedRoute (Left page, "in:" <> ch)) -- <> "#" <> (formatSlackTimestamp t)
         BackendRoute_SearchMessages :=> Identity pQuery -> do
           resp :: MessagesResponse <- authorizeUser cfg (renderFrontendRoute (_backendConfig_enc cfg) $ FrontendRoute_Search :/ pQuery) >>= \case
             Left e -> pure $ Left e
