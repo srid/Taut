@@ -1,19 +1,22 @@
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 module Frontend.Message where
 
 import Control.Monad
+import Data.Bool (bool)
 import Data.Functor.Identity
 import Data.Functor.Sum
-import Data.Maybe (fromMaybe, isJust)
+import Data.Maybe
+import Data.Monoid (First (..))
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time.Calendar
+import Data.Time.Clock
 import Text.Printf (printf)
 
 import Obelisk.Route.Frontend
@@ -26,18 +29,41 @@ import Common.Slack.Internal (formatSlackTimestamp)
 import Common.Slack.Types
 import Common.Types
 
-messageList :: DomBuilder t m => Paginated Message -> m ()
-messageList pm
-  | msgs == [] = text "No results"
+messageList
+  :: ( DomBuilder t m
+     , Prerender js t m
+     , SetRoute t (R FrontendRoute) m
+     , RouteToUrl (R FrontendRoute) m
+     )
+  => Maybe UTCTime
+  -> Paginated Message
+  -> m (Dynamic t (Maybe (Element EventResult GhcjsDomSpace t)))
+messageList toHighlight pm
+  | msgs == [] = text "No results" >> pure (constDyn Nothing)
   | otherwise = divClass "ui comments" $ do
-      forM_ (filter (isJust . _messageChannelName) msgs) $ singleMessage
+      fmap (fmap getFirst . mconcat) $ forM (filter (isJust . _messageChannelName) msgs) $
+        fmap (fmap First) . singleMessage toHighlight
   where
     msgs = paginatedItems pm
 
-singleMessage :: DomBuilder t m => Message -> m ()
-singleMessage msg = do
+singleMessage
+  :: ( DomBuilder t m
+     , Prerender js t m
+     , SetRoute t (R FrontendRoute) m
+     , RouteToUrl (R FrontendRoute) m
+     )
+  => Maybe UTCTime
+  -> Message
+  -> m (Dynamic t (Maybe (Element EventResult GhcjsDomSpace t)))
+  -- ^ The element that the caller should scroll to.
+singleMessage toHighlight msg = do
   let mts = formatSlackTimestamp (_messageTs msg)
-  elAttr "div" ("class" =: "comment" <> "id" =: mts) $ do
+      highlight = toHighlight == Just (_messageTs msg)
+  e <- if highlight
+    then prerender (pure Nothing) $ do
+      fmap (Just . fst) $ el' "div" blank
+    else pure $ constDyn Nothing
+  elAttr "div" ("class" =: "comment" <> "id" =: mts) $ bool id (divClass "ui piled black segment") highlight $ do
     divClass "content" $ do
       elClass "a" "author" $ do
         text $ fromMaybe "?unknown?" $ _messageUserName msg
@@ -48,12 +74,11 @@ singleMessage msg = do
           case _messageChannelName msg of
             Nothing -> text $ T.pack $ show $ _messageTs msg
             Just ch -> do
-              let rr = renderFrontendRoute enc $ FrontendRoute_Search :/ (PaginatedRoute (Right (_messageTs msg), "in:" <> ch))
-              elAttr "a" ("href" =: rr) $ text $ T.pack $ show $ _messageTs msg
+              let rr = FrontendRoute_Search :/ (PaginatedRoute (Right (_messageTs msg), "in:" <> ch))
+              routeLink rr $ text $ T.pack $ show $ _messageTs msg
       elAttr "div" ("class" =: "text") $ do
         renderSlackMessage $ _messageText msg
-  where
-    Right (enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute FrontendRoute))) PageName) = checkEncoder backendRouteEncoder
+  pure e
 
 -- TODO: This is not perfect yet.
 renderSlackMessage :: DomBuilder t m => Text -> m ()
