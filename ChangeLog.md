@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Fix extra space around search query breaking app
+- Read directly from the Zip archive
 
 ## v0.2 - 2019/05/11
 

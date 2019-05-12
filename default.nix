@@ -49,5 +49,6 @@ project ./. ({ pkgs, hackGet, ... }: {
     indexed-list-literals = doJailbreak super.indexed-list-literals;
     email-validate = doJailbreak super.email-validate;
     pagination = dontCheck super.pagination;
+    zip = dontCheck super.zip;
   };
 })

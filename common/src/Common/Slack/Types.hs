@@ -61,7 +61,6 @@ data Profile = Profile
 data ChannelT f = Channel
   { _channelId :: Columnar f Text
   , _channelName :: Columnar f Text
-  , _channelCreated :: Columnar f Text -- Uh
   }
   deriving (Generic)
 

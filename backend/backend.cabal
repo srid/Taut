@@ -43,6 +43,7 @@ library
                , text
                , time
                , yaml
+               , zip
   exposed-modules:
     Backend
     Backend.Config
@@ -97,3 +98,4 @@ executable backend
                , text
                , time
                , yaml
+               , zip
