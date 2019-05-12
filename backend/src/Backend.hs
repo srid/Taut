@@ -1,4 +1,3 @@
- {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
@@ -10,17 +9,18 @@ module Backend where
 
 import Control.Arrow ((&&&))
 import Control.Exception.Safe (throwString)
+import Control.Lens
 import Data.Aeson
+import Data.Default (def)
 import Data.Dependent.Sum (DSum ((:=>)))
 import Data.Foldable (foldl')
-import Data.Functor.Identity (Identity(..))
+import Data.Functor.Identity (Identity (..))
 import Data.Maybe (fromMaybe)
 import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.IO as T
-import Control.Lens
 
 import Database.Beam
 import Database.Beam.Sqlite (runBeamSqlite)
@@ -42,8 +42,8 @@ import Common.Types
 import Backend.Config
 import Backend.Import (SlackDb (..), populateDatabase, slackDb)
 import Backend.Login
-import Backend.Search.Parser (parseSearchQuery)
 import Backend.Search
+import Backend.Search.Parser (parseSearchQuery)
 
 
 backend :: Backend BackendRoute FrontendRoute
@@ -82,7 +82,7 @@ backend = Backend
           authorizeUser cfg (renderBackendRoute (_backendConfig_enc cfg) $ BackendRoute_LocateMessage :/ (ch, t)) >>= \case
             Left e -> redirect $ T.encodeUtf8 $ notAuthorizedLoginLink e
             Right _ -> do
-              let mf = allMessages & messageFilters_in .~ [ch]
+              let mf = def & messageFilters_in .~ [ch]
               page <- liftIO $ runBeamSqlite (_backendConfig_sqliteConn cfg) $ do
                 total <- countMessages cfg mf
                 after <- countMessages cfg $ mf & messageFilters_at ?~ t

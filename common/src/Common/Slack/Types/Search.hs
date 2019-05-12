@@ -12,10 +12,11 @@ module Common.Slack.Types.Search where
 import Control.Lens hiding ((<.))
 import Control.Monad
 import Data.Aeson
+import Data.Default
 import Data.Maybe
 import Data.Text (Text)
-import Data.Time.Clock
 import Data.Time.Calendar
+import Data.Time.Clock
 import GHC.Generics
 
 data MessageFilters = MessageFilters
@@ -32,15 +33,15 @@ data MessageFilters = MessageFilters
 
 makeLenses ''MessageFilters
 
+instance Default MessageFilters where
+  def = MessageFilters [] [] [] [] Nothing Nothing Nothing Nothing
+
 instance FromJSON MessageFilters
 instance ToJSON MessageFilters
-
-allMessages :: MessageFilters
-allMessages = MessageFilters [] [] [] [] Nothing Nothing Nothing Nothing
 
 isOnlyDuring :: MessageFilters -> Maybe Day
 isOnlyDuring mf = do
   firstDay <- listToMaybe (mf ^. messageFilters_during)
-  let mf' = allMessages & messageFilters_during .~ [firstDay]
+  let mf' = def & messageFilters_during .~ [firstDay]
   guard $ mf == mf'
   pure firstDay

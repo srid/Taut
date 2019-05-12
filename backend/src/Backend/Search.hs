@@ -10,6 +10,7 @@
 module Backend.Search where
 
 import Control.Lens hiding ((<.))
+import Data.Default (def)
 import qualified Data.List.NonEmpty as NEL
 import Data.Maybe
 import Data.Text (Text)
@@ -23,11 +24,11 @@ import Common.Slack.Types
 import Common.Slack.Types.Search
 
 import Backend.Import (SlackDb (..))
-import Backend.Search.Parser (SearchKeyword(..), SearchModifier(..))
+import Backend.Search.Parser (SearchKeyword (..), SearchModifier (..))
 
 
 mkMessageFilters :: [Either SearchModifier SearchKeyword] -> MessageFilters
-mkMessageFilters = foldl f allMessages
+mkMessageFilters = foldl f def
   where
     f mf = \case
       Right kw -> mf & messageFilters_terms %~ (unSearchKeyword kw:)

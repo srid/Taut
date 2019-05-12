@@ -13,8 +13,9 @@ library
                , beam-sqlite
                , bytestring
                , clientsession
-               , containers
                , common
+               , containers
+               , data-default
                , dependent-sum
                , dependent-sum-template
                , directory
@@ -65,8 +66,9 @@ executable backend
                , beam-sqlite
                , bytestring
                , clientsession
-               , containers
                , common
+               , containers
+               , data-default
                , dependent-sum
                , dependent-sum-template
                , directory

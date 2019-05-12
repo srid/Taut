@@ -11,6 +11,7 @@ library
                , bytestring
                , casing
                , containers
+               , data-default
                , dependent-sum
                , dependent-sum-template
                , filepath
