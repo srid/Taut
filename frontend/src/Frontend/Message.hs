@@ -79,7 +79,7 @@ singleMessage
   -> m ()
 singleMessage highlight msg = do
   let mts = formatSlackTimestamp (_messageTs msg)
-  elAttr "div" ("class" =: "comment" <> "id" =: mts) $ bool id (divClass "ui piled black segment") highlight $ do
+  elAttr "div" ("class" =: "comment" <> "id" =: mts) $ bool id (elAttr "div" ("style" =: "background-color: PapayaWhip;")) highlight $ do
     divClass "content" $ do
       elClass "a" "author" $ do
         text $ fromMaybe "?unknown?" $ _messageUserName msg
