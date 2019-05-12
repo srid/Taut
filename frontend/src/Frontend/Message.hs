@@ -1,19 +1,22 @@
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 module Frontend.Message where
 
 import Control.Monad
+import Data.Bool (bool)
 import Data.Functor.Identity
 import Data.Functor.Sum
-import Data.Maybe (fromMaybe, isJust)
+import Data.Maybe
+import Data.Monoid (First (..))
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time.Calendar
+import Data.Time.Clock
 import Text.Printf (printf)
 
 import Obelisk.Route.Frontend
@@ -26,18 +29,57 @@ import Common.Slack.Internal (formatSlackTimestamp)
 import Common.Slack.Types
 import Common.Types
 
-messageList :: DomBuilder t m => Paginated Message -> m ()
-messageList pm
-  | msgs == [] = text "No results"
+messageList
+  :: ( DomBuilder t m
+     , Prerender js t m
+     , SetRoute t (R FrontendRoute) m
+     , RouteToUrl (R FrontendRoute) m
+     )
+  => Maybe UTCTime
+  -> Paginated Message
+  -> m (Dynamic t (Maybe (Element EventResult GhcjsDomSpace t)))
+  -- ^ The element that the caller should scroll to.
+messageList toHighlight pm
+  | msgs == [] = text "No results" >> pure (constDyn Nothing)
   | otherwise = divClass "ui comments" $ do
-      forM_ (filter (isJust . _messageChannelName) msgs) $ singleMessage
+      fmap (fmap getFirst . mconcat) $ forM msgs $ \msg -> do
+        let highlight = toHighlight == Just (_messageTs msg)
+        bookmark <- if highlight
+          then bookmarkElement
+          else pure $ constDyn Nothing
+        singleMessage highlight msg
+        pure $ fmap First bookmark
   where
-    msgs = paginatedItems pm
+    msgs = filter hasChannel $ paginatedItems pm
 
-singleMessage :: DomBuilder t m => Message -> m ()
-singleMessage msg = do
+    hasChannel = isJust . _messageChannelName
+
+    -- | Create an invisible HTML element that can later be used with JavaScript.
+    --
+    -- This has to be run inside prerender due to the GhcjsDomSpace constraint
+    -- that is required when running JavaScript on the created element.
+    --
+    -- A typical use case for this function is to mark a location in DOM to
+    -- scroll to after build.
+    bookmarkElement
+      :: ( DomBuilder t m
+         , Prerender js t m
+         )
+      => m (Dynamic t (Maybe (Element EventResult GhcjsDomSpace t)))
+    bookmarkElement = prerender (pure Nothing) $ do
+      fmap (Just . fst) $ el' "div" blank
+
+singleMessage
+  :: ( DomBuilder t m
+     , SetRoute t (R FrontendRoute) m
+     , RouteToUrl (R FrontendRoute) m
+     )
+  => Bool
+  -> Message
+  -> m ()
+singleMessage highlight msg = do
   let mts = formatSlackTimestamp (_messageTs msg)
-  elAttr "div" ("class" =: "comment" <> "id" =: mts) $ do
+  elAttr "div" ("class" =: "comment" <> "id" =: mts) $ bool id (elAttr "div" ("style" =: "background-color: PapayaWhip;")) highlight $ do
     divClass "content" $ do
       elClass "a" "author" $ do
         text $ fromMaybe "?unknown?" $ _messageUserName msg
@@ -48,12 +90,13 @@ singleMessage msg = do
           case _messageChannelName msg of
             Nothing -> text $ T.pack $ show $ _messageTs msg
             Just ch -> do
-              let rr = renderFrontendRoute enc $ FrontendRoute_Search :/ (PaginatedRoute (Right (_messageTs msg), "in:" <> ch))
-              elAttr "a" ("href" =: rr) $ text $ T.pack $ show $ _messageTs msg
+              routeLink (permalink ch) $ text $ T.pack $ show $ _messageTs msg
       elAttr "div" ("class" =: "text") $ do
         renderSlackMessage $ _messageText msg
   where
-    Right (enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute FrontendRoute))) PageName) = checkEncoder backendRouteEncoder
+    -- A message permalink is a listing of all messages in its channel, with the
+    -- cursor pointing to the message itself.
+    permalink ch = FrontendRoute_Search :/ (PaginatedRoute (Right (_messageTs msg), "in:" <> ch))
 
 -- TODO: This is not perfect yet.
 renderSlackMessage :: DomBuilder t m => Text -> m ()

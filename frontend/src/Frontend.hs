@@ -17,6 +17,10 @@ import Data.Semigroup ((<>))
 import qualified Data.Text as T
 import Data.Time.Calendar
 
+import GHCJS.DOM (currentWindowUnchecked)
+import GHCJS.DOM.Element (scrollIntoView)
+import GHCJS.DOM.Window (scrollTo)
+
 import Reflex.Dom.Core
 
 import Obelisk.Frontend
@@ -46,24 +50,29 @@ frontend = Frontend
       --     dynText $ fmap (T.pack . show) r
       elAttr "link" ("rel" =: "stylesheet" <> "type" =: "text/css" <> "href" =: static @"semantic.min.css") blank
   , _frontend_body = do
-      divClass "ui container" $ do
+      divClass "ui container" $ mdo
         divClass ("ui top attached inverted segment " <> themeColor) $
             routeLink (FrontendRoute_Home :/ ()) $
               elClass "h1" "ui inverted header" $ text "Taut - Slack Archive Viewer"
-        userE <- divClass "ui attached segment" $ do
+
+        highlightE <- delay 0.2 $ updated highlight  -- Delay until DOM is ready.
+        void $ prerender blank $ widgetHold_ blank $ ffor highlightE $ \case
+          Nothing ->
+            currentWindowUnchecked >>= \w -> scrollTo w 0 0
+          Just e ->
+            scrollIntoView (_element_raw e) True
+
+        highlight :: Dynamic t (Maybe (Element EventResult GhcjsDomSpace t)) <- divClass "ui attached segment" $ do
           divClass ("ui raised large segment " <> themeColor) $ divClass "ui search" $ do
             divClass "ui icon inverted fluid input" $ do
               r <- askRoute
-              -- NOTE: setRoute should ideally scroll to top automaticlly, but it
-              -- does not so we do it here.
-              widgetHold_ blank $ ffor (updated r) $ const scrollToTop
               let query = ffor r $ \case
                     FrontendRoute_Home :=> Identity () -> ""
                     FrontendRoute_Search :=> Identity pr -> paginatedRouteValue pr
               searchInputWidgetWithRoute query $ \q ->
                 FrontendRoute_Search :/ (mkPaginatedRouteAtPage1 $ T.strip q)
 
-          fmap switchDyn $ subRoute $ \case
+          fmap join $ subRoute $ \case
             FrontendRoute_Home -> do
               resp <- getSearchExamples
               widgetHold_ loader $ ffor resp $ \case
@@ -79,17 +88,22 @@ frontend = Frontend
                         routeLinkClass r "ui header" $ text query
                         divClass "description" $ text title
                   el "p" blank
-              pure $ fmap fst $ filterRight $ fforMaybe resp id
+              pure $ constDyn Nothing
             FrontendRoute_Search -> do
               r  <- askRoute
-              resp <- getMessages r (BackendRoute_SearchMessages :/)
-              widgetHold_ loader $ ffor resp $ \case
-                Nothing -> text "Something went wrong"
-                Just (Left na) -> notAuthorizedWidget na
+              respE <- getMessages r (BackendRoute_SearchMessages :/)
+              fmap join $ widgetHold (loader >> pure (constDyn Nothing)) $ ffor (attach (current r) respE) $ \(pr, resp) -> case resp of
+                Nothing -> do
+                  text "Something went wrong"
+                  pure (constDyn Nothing)
+                Just (Left na) -> do
+                  notAuthorizedWidget na
+                  pure (constDyn Nothing)
                 Just (Right (_, Left ())) -> do
                   divClass "ui error message" $ do
                     divClass "header" $ text "Bad search query"
                     el "p" $ text "Your search query is malformed."
+                  pure $ constDyn Nothing
                 Just (Right (_, Right (mf, v))) -> do
                   case Search.isOnlyDuring mf of
                     Nothing -> do
@@ -108,12 +122,11 @@ frontend = Frontend
                           el "b" $ text "next"
                         text " day."
                   divClass "ui horizontal divider" blank
-                  renderMessagesWithPagination r FrontendRoute_Search v
-              pure $ fmap fst $ filterRight $ fforMaybe resp id
+                  let msgRef = either (const Nothing) Just $ paginatedRouteCursor pr
+                      pageNav = paginationNav v $ \p' -> FrontendRoute_Search :/ (PaginatedRoute (Left p', paginatedRouteValue pr))
+                  pageNav *> messageList msgRef v <* pageNav
         divClass "ui bottom attached secondary segment" $ do
           elAttr "a" ("href" =: "https://github.com/srid/Taut") $ text "Powered by Haskell"
-          widgetHold_ blank $ ffor userE $ \(SlackUser name _) ->
-            divClass "item" $ text $ "Welcome " <> name
   }
   where
     loader :: DomBuilder t m => m ()
@@ -130,8 +143,3 @@ frontend = Frontend
       where
         slackLoginButton r = elAttr "a" ("href" =: r) $
           elAttr "img" ("src" =: "https://api.slack.com/img/sign_in_with_slack.png") blank
-
-    renderMessagesWithPagination r mkR pm = do
-      let pageW = dyn_ $ ffor r $ \pr ->
-            paginationNav pm $ \p' -> mkR :/ (PaginatedRoute (Left p', paginatedRouteValue pr))
-      pageW >> messageList pm >> pageW
