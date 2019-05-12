@@ -38,31 +38,47 @@ messageList
   => Maybe UTCTime
   -> Paginated Message
   -> m (Dynamic t (Maybe (Element EventResult GhcjsDomSpace t)))
+  -- ^ The element that the caller should scroll to.
 messageList toHighlight pm
   | msgs == [] = text "No results" >> pure (constDyn Nothing)
   | otherwise = divClass "ui comments" $ do
-      fmap (fmap getFirst . mconcat) $ forM (filter (isJust . _messageChannelName) msgs) $
-        fmap (fmap First) . singleMessage toHighlight
+      fmap (fmap getFirst . mconcat) $ forM msgs $ \msg -> do
+        let highlight = toHighlight == Just (_messageTs msg)
+        bookmark <- if highlight
+          then bookmarkElement
+          else pure $ constDyn Nothing
+        singleMessage highlight msg
+        pure $ fmap First bookmark
   where
-    msgs = paginatedItems pm
+    msgs = filter hasChannel $ paginatedItems pm
+
+    hasChannel = isJust . _messageChannelName
+
+    -- | Create an invisible HTML element that can later be used with JavaScript.
+    --
+    -- This has to be run inside prerender due to the GhcjsDomSpace constraint
+    -- that is required when running JavaScript on the created element.
+    --
+    -- A typical use case for this function is to mark a location in DOM to
+    -- scroll to after build.
+    bookmarkElement
+      :: ( DomBuilder t m
+         , Prerender js t m
+         )
+      => m (Dynamic t (Maybe (Element EventResult GhcjsDomSpace t)))
+    bookmarkElement = prerender (pure Nothing) $ do
+      fmap (Just . fst) $ el' "div" blank
 
 singleMessage
   :: ( DomBuilder t m
-     , Prerender js t m
      , SetRoute t (R FrontendRoute) m
      , RouteToUrl (R FrontendRoute) m
      )
-  => Maybe UTCTime
+  => Bool
   -> Message
-  -> m (Dynamic t (Maybe (Element EventResult GhcjsDomSpace t)))
-  -- ^ The element that the caller should scroll to.
-singleMessage toHighlight msg = do
+  -> m ()
+singleMessage highlight msg = do
   let mts = formatSlackTimestamp (_messageTs msg)
-      highlight = toHighlight == Just (_messageTs msg)
-  e <- if highlight
-    then prerender (pure Nothing) $ do
-      fmap (Just . fst) $ el' "div" blank
-    else pure $ constDyn Nothing
   elAttr "div" ("class" =: "comment" <> "id" =: mts) $ bool id (divClass "ui piled black segment") highlight $ do
     divClass "content" $ do
       elClass "a" "author" $ do
@@ -78,7 +94,6 @@ singleMessage toHighlight msg = do
               routeLink rr $ text $ T.pack $ show $ _messageTs msg
       elAttr "div" ("class" =: "text") $ do
         renderSlackMessage $ _messageText msg
-  pure e
 
 -- TODO: This is not perfect yet.
 renderSlackMessage :: DomBuilder t m => Text -> m ()
