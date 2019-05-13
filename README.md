@@ -12,12 +12,43 @@ Slack community I help manage.
       keywords.
 - [X] Authorization using Slack login (only the organization's Slack users can
       access Taut).
-- [ ] Ready for general use (not yet).
+- [X] Ready for general use.
 
-## Running
+## Running locally
 
 1. Install [obelisk](https://github.com/obsidiansystems/obelisk)
-1. Appropriately configure the app by changing `config/backend/*`
-  - You will need your Slack OAuth keys
-  - And specify the path to your Slack export zip file.
-1. Clone this repo, and run `ob run`
+1. Set`config/backend/slackExportPath` to where you downloaded your Slack export
+   zip.
+1. Run `ob run` and visit http://localhost:8080
+
+## Running production app
+
+To deploy the app either locally or elsewhere follow these instructions. In
+future we could automate all of this using Nix. Alternatively, if the machine
+you are deploying to is reserved __exclusively_ for running Taut, you may use
+[`ob deploy`](https://github.com/obsidiansystems/obelisk#deploying).
+
+```bash
+# Create a directory to hold deployment configuration (Do this just once)
+mkdir -p deploy/prod
+cp -r config deploy/prod/ 
+
+# Do a full build of the app, and copy the binaries to deploy directory
+nix-build -A exe  # This creates ./result 
+rm -f deploy/prod/*  # This would leave the "config" directory as is
+cp -r result/* deploy/prod/
+
+# Create a Slack OAuth app, and add its keys here:
+pushd deploy/prod 
+echo "..." > config/backend/oauthClientID
+echo "..." > config/backend/oauthClientSecret
+
+# As a Slack admin download a copy of your Slack export data. 
+# It should be a zip file. Add its path here.
+echo "..." > config/backend/slackExportPath
+
+# Run the app
+./backend --port 9000
+
+# Visit http://localhost:9000 for profit!
+```

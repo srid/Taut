@@ -1,14 +1,15 @@
 # Taut revision history
 
-## Unreleased
+## v1.0 - 2019/05/13
 
 - Fix extra space around search query breaking app
 - Read directly from the Zip archive
 - Add `after:` and `before:` to search query
-- Permalink improvementrs
+- Permalink improvements:
   - Message permalinks no longer have page numbers in their URL, and are thus
     "permanent".
   - Auto scroll to referenced message automatically.
+- Make export data path configurable.
 
 ## v0.2 - 2019/05/11
 
