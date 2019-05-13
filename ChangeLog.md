@@ -1,6 +1,6 @@
 # Taut revision history
 
-## v1.0 - 2019/05/13
+## Unreleased
 
 - Fix extra space around search query breaking app
 - Read directly from the Zip archive
