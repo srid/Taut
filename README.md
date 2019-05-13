@@ -1,6 +1,6 @@
 # Taut
 
-An ambitious Slack JSON archive viewer. Work in progress.
+An ambitious [Slack export data](https://get.slack.help/hc/en-us/articles/201658943-Export-your-workspace-data) viewer.
 
 Taut is currently being used to access and search about 50,000 messages in a
 Slack community I help manage.
