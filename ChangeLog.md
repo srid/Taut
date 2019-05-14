@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-- Fix extra space around search query breaking app
+- Search fixes:
+  - Fix extra space around search query breaking app
+  - Allow punctuation in channel name and search keywords (#25)
 - Read directly from the Zip archive
 - Add `after:` and `before:` to search query
 - Permalink improvements:

@@ -25,27 +25,28 @@ Slack community I help manage.
 
 To deploy the app either locally or elsewhere follow these instructions. In
 future we could automate all of this using Nix. Alternatively, if the machine
-you are deploying to is reserved __exclusively_ for running Taut, you may use
+you are deploying to is reserved _exclusively_ for running Taut, you may use
 [`ob deploy`](https://github.com/obsidiansystems/obelisk#deploying).
 
 ```bash
-# Create a directory to hold deployment configuration (Do this just once)
+# Create a directory to hold deployment configuration.
 mkdir -p deploy/prod
 cp -r config deploy/prod/ 
-
-# Do a full build of the app, and copy the binaries to deploy directory
-nix-build -A exe  # This creates ./result 
-rm -f deploy/prod/*  # This would leave the "config" directory as is
-cp -r result/* deploy/prod/
 
 # Create a Slack OAuth app, and add its keys here:
 pushd deploy/prod 
 echo "..." > config/backend/oauthClientID
 echo "..." > config/backend/oauthClientSecret
-
 # As a Slack admin download a copy of your Slack export data. 
 # It should be a zip file. Add its path here.
 echo "..." > config/backend/slackExportPath
+popd
+
+# When ready to create a new deployment:
+# Do a full build of the app, and copy the binaries to deploy directory
+nix-build -A exe  # This creates ./result 
+rm -f deploy/prod/*  # This would leave the "config" directory as is
+cp -r result/* deploy/prod/
 
 # Run the app
 ./backend --port 9000

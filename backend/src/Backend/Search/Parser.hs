@@ -79,9 +79,9 @@ quotedText = do
   void $ string "\""
   pure s
 
--- FIXME: Won't include stuff like hyphens.
+-- FIXME: Can there be more than alphaNum and punctuations?
 someWord :: Parser Text
-someWord = T.pack <$> some alphaNumChar -- TODO: Review the accuracy of this
+someWord = T.pack <$> some (alphaNumChar <|> punctuationChar)
 
 attribute :: Text -> Parser ()
 attribute name = void $ string $ name <> ":"

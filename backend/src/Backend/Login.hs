@@ -76,6 +76,7 @@ authorizeUser cfg r = do
         whitelist =
           [ "http://localhost:"
           , "http://10.100.0.2:"  -- Wireguard
+          , "http://penguin.linux.test"  -- Chrome OS crostini
           ]
 
 setSlackTokenToCookie :: MonadSnap m => BackendConfig -> SlackTokenResponse -> m ()
