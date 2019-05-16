@@ -1,6 +1,6 @@
 # Taut revision history
 
-## Unreleased
+## v1.0 - 2019/05/16
 
 - Search fixes:
   - Fix extra space around search query breaking app
