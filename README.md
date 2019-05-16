@@ -3,16 +3,14 @@
 An ambitious [Slack export data](https://get.slack.help/hc/en-us/articles/201658943-Export-your-workspace-data) viewer.
 
 Taut is currently being used to access and search about 50,000 messages in a
-Slack community I help manage.
+Slack community I help manage, and is now ready for general use.
 
 ## Features
 
-- [X] Read directly from the Zip archive that Slack provides
-- [X] Full access to view all messages and search them by user, channel, date or
-      keywords.
-- [X] Authorization using Slack login (only the organization's Slack users can
-      access Taut).
-- [X] Ready for general use.
+- [X] Read directly from the Slack export data zip archive
+- [X] Access _all_ messages, and search them as you would on Slack.
+- [X] Every message comes with its own permalink
+- [X] Only accessible to the organization's members (uses Slack's login)
 
 ## Running locally
 
