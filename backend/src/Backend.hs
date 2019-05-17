@@ -29,6 +29,7 @@ import Data.Pagination
 import Snap
 
 import Obelisk.Backend as Ob
+import Obelisk.ExecutableConfig.Backend (runBackendConfigsT)
 import Obelisk.OAuth.Authorization
 import Obelisk.Route hiding (decode, encode)
 
@@ -47,52 +48,57 @@ import Backend.Search.Parser (parseSearchQuery)
 backend :: Backend BackendRoute FrontendRoute
 backend = Backend
   { _backend_routeEncoder = backendRouteEncoder
-  , _backend_run = \serve -> SQLite.withConnection "" $ \conn -> do
-      team <- liftIO $ populateDatabase conn =<< getSlackExportPath
-      cfg <- readBackendConfig conn team
-      liftIO $ T.putStrLn $ "routeEnv: " <> _backendConfig_routeEnv cfg
-
-      serve $ \case
-        BackendRoute_Missing :=> Identity () -> do
-          writeLBS "404"
-        BackendRoute_OAuth :=> Identity (OAuth_RedirectUri :=> Identity p) -> case p of
-          Nothing -> liftIO $ throwString "Expected to receive the authorization code here"
-          Just (RedirectUriParams code mstate) -> do
-            handleOAuthCallback cfg code
-            redirect $ T.encodeUtf8 $ fromMaybe (renderFrontendRoute (_backendConfig_enc cfg) $ FrontendRoute_Home :/ ()) mstate
-        BackendRoute_GetSearchExamples :=> Identity () -> do
-          resp :: ExamplesResponse <- authorizeUser cfg (renderFrontendRoute (_backendConfig_enc cfg) $ FrontendRoute_Home :/ ()) >>= \case
-            Left e -> pure $ Left e
-            Right u -> do
-              -- TODO: This should be generic, and dates determined automatically.
-              let examples :: [(Text, Text)] =
-                    [ ("Do a basic search", "sunny day")
-                    , ("Use quotes for exact match", "\"great day\"")
-                    , ("Browse messages on a particular day", "during:2018-8-23")
-                    , ("All messages in #general channel", "in:general")
-                    , ("Messages by Andrew in #random channel", "in:random from:andrew")
-                    , ("Messages in #general after August 2018", "after:2018-08-01 in:general")
-                    , ("Messages in #random during mid 2016", "after:2016-08-01 before:2016-09-01 in:random")
-                    ]
-              pure $ Right (u, examples)
-          writeLBS $ encode resp
-        BackendRoute_SearchMessages :=> Identity pQuery -> do
-          resp :: MessagesResponse <- authorizeUser cfg (renderFrontendRoute (_backendConfig_enc cfg) $ FrontendRoute_Search :/ pQuery) >>= \case
-            Left e -> pure $ Left e
-            Right u -> do
-              case parseSearchQuery (paginatedRouteValue pQuery) of
-                Left err -> do
-                  liftIO $ putStrLn $ show err
-                  pure $ Right (u, Left ())
-                Right q -> do
-                  let mf = mkMessageFilters q
-                  liftIO $ putStrLn $ show mf
-                  pagination <- liftIO $ mkPaginationFromRoute cfg mf pQuery
-                  msgs <- queryMessages cfg mf $ pagination
-                  pure $ Right $ (u, Right (mf, msgs))
-          writeLBS $ encode resp
+  , _backend_run = \serve -> do
+      backendConfigs <- Ob._componentConfigs_backend <$> liftIO Ob.getComponentConfigs
+      liftIO $ SQLite.withConnection "" $ \conn -> runBackendConfigsT backendConfigs $ do
+        Just slackExportPath <- getSlackExportPath
+        team <- liftIO $ populateDatabase conn slackExportPath
+        cfg <- readBackendConfig conn team
+        liftIO $ T.putStrLn $ "routeEnv: " <> _backendConfig_routeEnv cfg
+        serve $ requestHandler cfg
   }
   where
+    requestHandler :: MonadSnap m => BackendConfig -> R BackendRoute -> m ()
+    requestHandler cfg = \case
+      BackendRoute_Missing :=> Identity () -> do
+        writeLBS "404"
+      BackendRoute_OAuth :=> Identity (OAuth_RedirectUri :=> Identity p) -> case p of
+        Nothing -> liftIO $ throwString "Expected to receive the authorization code here"
+        Just (RedirectUriParams code mstate) -> do
+          handleOAuthCallback cfg code
+          redirect $ T.encodeUtf8 $ fromMaybe (renderFrontendRoute (_backendConfig_enc cfg) $ FrontendRoute_Home :/ ()) mstate
+      BackendRoute_GetSearchExamples :=> Identity () -> do
+        resp :: ExamplesResponse <- authorizeUser cfg (renderFrontendRoute (_backendConfig_enc cfg) $ FrontendRoute_Home :/ ()) >>= \case
+          Left e -> pure $ Left e
+          Right u -> do
+            -- TODO: This should be generic, and dates determined automatically.
+            let examples :: [(Text, Text)] =
+                  [ ("Do a basic search", "sunny day")
+                  , ("Use quotes for exact match", "\"great day\"")
+                  , ("Browse messages on a particular day", "during:2018-8-23")
+                  , ("All messages in #general channel", "in:general")
+                  , ("Messages by Andrew in #random channel", "in:random from:andrew")
+                  , ("Messages in #general after August 2018", "after:2018-08-01 in:general")
+                  , ("Messages in #random during mid 2016", "after:2016-08-01 before:2016-09-01 in:random")
+                  ]
+            pure $ Right (u, examples)
+        writeLBS $ encode resp
+      BackendRoute_SearchMessages :=> Identity pQuery -> do
+        resp :: MessagesResponse <- authorizeUser cfg (renderFrontendRoute (_backendConfig_enc cfg) $ FrontendRoute_Search :/ pQuery) >>= \case
+          Left e -> pure $ Left e
+          Right u -> do
+            case parseSearchQuery (paginatedRouteValue pQuery) of
+              Left err -> do
+                liftIO $ putStrLn $ show err
+                pure $ Right (u, Left ())
+              Right q -> do
+                let mf = mkMessageFilters q
+                liftIO $ putStrLn $ show mf
+                pagination <- liftIO $ mkPaginationFromRoute cfg mf pQuery
+                msgs <- queryMessages cfg mf $ pagination
+                pure $ Right $ (u, Right (mf, msgs))
+        writeLBS $ encode resp
+
     mkPaginationFromRoute cfg mf p = mkPagination (_backendConfig_pageSize cfg) =<< case paginatedRouteCursor p of
       Left pg -> pure pg
       Right t -> locateMessage cfg mf t

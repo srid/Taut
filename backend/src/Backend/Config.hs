@@ -8,7 +8,7 @@
 
 module Backend.Config where
 
-import Control.Exception.Safe (Exception, throwIO)
+import Control.Monad.IO.Class
 import Data.Functor.Identity (Identity)
 import Data.Functor.Sum
 import Data.Text (Text)
@@ -20,7 +20,7 @@ import Network.HTTP.Client
 import Network.HTTP.Client.TLS
 import Web.ClientSession
 
-import qualified Obelisk.ExecutableConfig as Cfg
+import Obelisk.ExecutableConfig.Backend (HasBackendConfigs, getBackendConfig, getCommonConfig)
 import Obelisk.Route hiding (decode, encode)
 
 import Common.Route
@@ -39,24 +39,17 @@ data BackendConfig = BackendConfig
   , _backendConfig_slackExportPath :: Text
   }
 
-data InvalidConfig
-  = InvalidConfig_Missing Text
-  | InvalidConfig_Empty Text
-  deriving (Eq, Show, Ord)
-
-instance Exception InvalidConfig
-
-readBackendConfig :: SQLite.Connection -> SlackTeam -> IO BackendConfig
-readBackendConfig conn team = BackendConfig enc
-  <$> (snd <$> randomKey)
-  <*> newTlsManager
-  <*> pure conn
-  <*> pure team
-  <*> pure defaultPageSize
-  <*> getConfigNonEmpty "config/common/route"
-  <*> getConfigNonEmpty "config/backend/oauthClientID"
-  <*> getConfigNonEmpty "config/backend/oauthClientSecret"
-  <*> getSlackExportPath
+readBackendConfig
+  :: (HasBackendConfigs m, MonadIO m)
+  => SQLite.Connection -> SlackTeam -> m BackendConfig
+readBackendConfig conn team = do
+  Just route <- fmap T.strip <$> getCommonConfig "route"
+  Just oauthClientID <- fmap T.strip <$> getBackendConfig "oauthClientID"
+  Just oauthClientSecret <- fmap T.strip <$> getBackendConfig "oauthClientSecret"
+  Just slackExportPath <- getSlackExportPath
+  k <- snd <$> liftIO randomKey
+  tlsMgr <- liftIO newTlsManager
+  pure $ BackendConfig enc k tlsMgr conn team defaultPageSize route oauthClientID oauthClientSecret slackExportPath
   where
     Right (enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute FrontendRoute))) PageName) = checkEncoder backendRouteEncoder
     -- WARNING: Changing the default page size will invalidate existing message
@@ -67,12 +60,5 @@ readBackendConfig conn team = BackendConfig enc
     -- is still possible.
     defaultPageSize = 30
 
-getSlackExportPath :: IO Text
-getSlackExportPath = getConfigNonEmpty "config/backend/slackExportPath"
-
-getConfigNonEmpty :: Text -> IO Text
-getConfigNonEmpty p = Cfg.get p >>= \case
-  Nothing -> throwIO $ InvalidConfig_Missing p
-  Just v' -> do
-    let v = T.strip v'
-    if T.null v then throwIO (InvalidConfig_Empty p) else pure v
+getSlackExportPath :: HasBackendConfigs m => m (Maybe Text)
+getSlackExportPath = fmap T.strip <$> getBackendConfig "slackExportPath"
