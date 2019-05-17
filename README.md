@@ -19,7 +19,7 @@ Slack community I help manage.
 1. Install [obelisk](https://github.com/obsidiansystems/obelisk)
 1. Set`config/backend/slackExportPath` to where you downloaded your Slack export
    zip.
-1. Run `ob run` and visit http://localhost:8080
+1. Run `ob run` and visit http://127.0.0.1:8000
 
 ## Running production app
 
