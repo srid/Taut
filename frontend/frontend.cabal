@@ -15,7 +15,7 @@ library
                , lens
                , modern-uri
                , mtl
-               , obelisk-executable-config
+               , obelisk-executable-config-frontend
                , obelisk-frontend
                , obelisk-generated-static
                , obelisk-oauth-common
@@ -46,7 +46,7 @@ executable frontend
                , lens
                , modern-uri
                , mtl
-               , obelisk-executable-config
+               , obelisk-executable-config-frontend
                , obelisk-frontend
                , obelisk-generated-static
                , obelisk-oauth-common

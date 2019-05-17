@@ -43,9 +43,9 @@ frontend = Frontend
       el "title" $ text "Taut - Slack Archive Viewer"
       -- FIXME: This throws JSException
       -- el "title" $ subRoute_ $ \case
-      --   Route_Home -> text "Taut"
-      --   Route_Messages -> do
-      --     r :: Dynamic t Day <- askRoute
+      --   FrontendRoute_Home -> text "Taut"
+      --   FrontendRoute_Search -> do
+      --     r :: Dynamic t (PaginatedRoute UTCTime Text) <- askRoute
       --     text "Taut - "
       --     dynText $ fmap (T.pack . show) r
       elAttr "link" ("rel" =: "stylesheet" <> "type" =: "text/css" <> "href" =: static @"semantic.min.css") blank
@@ -55,7 +55,8 @@ frontend = Frontend
             routeLink (FrontendRoute_Home :/ ()) $
               elClass "h1" "ui inverted header" $ text "Taut - Slack Archive Viewer"
 
-        highlightE <- delay 0.2 $ updated highlight  -- Delay until DOM is ready.
+        highlightE :: Event t (Maybe (Element EventResult GhcjsDomSpace t)) <- fmap switchDyn $ prerender (pure never) $
+          delay 0.2 $ updated highlight  -- Delay until DOM is ready.
         void $ prerender blank $ widgetHold_ blank $ ffor highlightE $ \case
           Nothing ->
             currentWindowUnchecked >>= \w -> scrollTo w 0 0

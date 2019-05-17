@@ -30,7 +30,7 @@ library
                , modern-uri
                , obelisk-backend
                , obelisk-backend
-               , obelisk-executable-config
+               , obelisk-executable-config-backend
                , obelisk-oauth-backend
                , obelisk-oauth-common
                , obelisk-route
@@ -84,8 +84,7 @@ executable backend
                , modern-uri
                , obelisk-backend
                , obelisk-backend
-               , obelisk-executable-config
-               , obelisk-executable-config
+               , obelisk-executable-config-backend
                , obelisk-executable-config-inject
                , obelisk-oauth-backend
                , obelisk-oauth-common
