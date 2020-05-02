@@ -10,7 +10,6 @@ module Frontend.Message where
 import Control.Monad
 import Data.Bool (bool)
 import Data.Functor.Identity
-import Data.Functor.Sum
 import Data.Maybe
 import Data.Monoid (First (..))
 import Data.Text (Text)
@@ -73,6 +72,7 @@ singleMessage
   :: ( DomBuilder t m
      , SetRoute t (R FrontendRoute) m
      , RouteToUrl (R FrontendRoute) m
+     , Prerender js t m
      )
   => Bool
   -> Message
@@ -120,7 +120,7 @@ getMessages dr mkUrl = switchHold never <=< dyn $ ffor dr $ \r -> do
     pb <- getPostBuild
     getAndDecode $ (renderBackendRoute enc . mkUrl) r <$ pb
   where
-    Right (enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute FrontendRoute))) PageName) = checkEncoder backendRouteEncoder
+    Right (enc :: Encoder Identity Identity (R (FullRoute BackendRoute FrontendRoute)) PageName) = checkEncoder fullRouteEncoder
 
 getSearchExamples
   :: (MonadHold t m, PostBuild t m, Prerender js t m)
@@ -130,7 +130,7 @@ getSearchExamples = do
     pb <- getPostBuild
     getAndDecode $ (renderBackendRoute enc $ (BackendRoute_GetSearchExamples :/ ())) <$ pb
   where
-    Right (enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute FrontendRoute))) PageName) = checkEncoder backendRouteEncoder
+    Right (enc :: Encoder Identity Identity (R (FullRoute BackendRoute FrontendRoute)) PageName) = checkEncoder fullRouteEncoder
 
 routeForDay :: Day -> R FrontendRoute
 routeForDay day = FrontendRoute_Search :/ mkPaginatedRouteAtPage1 ("during:" <> showDay day)

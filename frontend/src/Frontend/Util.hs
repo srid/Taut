@@ -50,7 +50,7 @@ subRouteMenu
 subRouteMenu rs = do
   forM_ rs $ \(mr, w) -> do
     r <- askRoute
-    let active = ffor r $ \(r' :/ _) -> mr == This r'
+    let active = ffor r $ \(r' :/ _) -> mr == Some r'
     w active
 
 elHeader :: DomBuilder t m => Text -> m a -> m b -> m b

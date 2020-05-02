@@ -86,7 +86,7 @@ someWord = T.pack <$> some (alphaNumChar <|> punctuationChar)
 attribute :: Text -> Parser ()
 attribute name = void $ string $ name <> ":"
 
-parseSearchQuery :: Text -> Either (ParseError Char Void) [Either SearchModifier SearchKeyword]
+parseSearchQuery :: Text -> Either (ParseErrorBundle Text Void) [Either SearchModifier SearchKeyword]
 parseSearchQuery q = runParser p "<user-query>" q
   where
     p = sepBy (Left <$> searchModifier <|> Right <$> searchKeyword) space1

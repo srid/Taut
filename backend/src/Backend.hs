@@ -20,6 +20,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.IO as T
+import qualified Data.Map.Strict as Map
 
 import Database.Beam
 import Database.Beam.Sqlite (runBeamSqlite)
@@ -28,8 +29,8 @@ import qualified Database.SQLite.Simple as SQLite
 import Data.Pagination
 import Snap
 
-import Obelisk.Backend as Ob
-import Obelisk.ExecutableConfig.Backend (runBackendConfigsT)
+import Obelisk.ExecutableConfig.Lookup
+import Obelisk.Backend (Backend(..))
 import Obelisk.OAuth.Authorization
 import Obelisk.Route hiding (decode, encode)
 
@@ -47,11 +48,12 @@ import Backend.Search.Parser (parseSearchQuery)
 
 backend :: Backend BackendRoute FrontendRoute
 backend = Backend
-  { _backend_routeEncoder = backendRouteEncoder
+  { _backend_routeEncoder = fullRouteEncoder
   , _backend_run = \serve -> do
-      backendConfigs <- Ob._componentConfigs_backend <$> liftIO Ob.getComponentConfigs
-      liftIO $ SQLite.withConnection "" $ \conn -> runBackendConfigsT backendConfigs $ do
-        Just slackExportPath <- getSlackExportPath
+      liftIO $ SQLite.withConnection "" $ \conn -> do
+        configs <- getConfigs
+        let Just slackExportPath = T.strip . T.decodeUtf8 <$>
+                      Map.lookup "backend/slackExportPath" configs
         team <- liftIO $ populateDatabase conn slackExportPath
         cfg <- readBackendConfig conn team
         liftIO $ T.putStrLn $ "routeEnv: " <> _backendConfig_routeEnv cfg

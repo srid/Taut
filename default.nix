@@ -10,6 +10,7 @@ project ./. ({ pkgs, hackGet, ... }: {
 
   packages = let
     obelisk-oauth = hackGet ./dep/obelisk-oauth;
+    dsum = builtins.fetchTarball "https://github.com/obsidiansystems/dependent-sum/archive/73ab6cb.tar.gz";
   in {
     clay = pkgs.fetchFromGitHub {
       owner = "sebastiaanvisser";
@@ -20,6 +21,8 @@ project ./. ({ pkgs, hackGet, ... }: {
     obelisk-oauth-common = obelisk-oauth + "/common";
     obelisk-oauth-backend = obelisk-oauth + "/backend";
     pagination = hackGet ./dep/pagination; # https://github.com/mrkkrp/pagination/issues/6
+      #dependent-sum = dsum + "/dependent-sum";
+      #dependent-sum-template = dsum + "/dependent-sum-template";
   };
 
   overrides = self: super: with pkgs.haskell.lib; let
@@ -30,12 +33,12 @@ project ./. ({ pkgs, hackGet, ... }: {
       rev = "8e3da41c46b5de19942cc7bf421c3deb5117ba7a";
       sha256 = "0ffk5j1db2y1drn0przh4jw9gc3vygwd987wl1g1m3dw7ry4dxy6";
     };
-    vector-sized-src = pkgs.fetchFromGitHub {
-      owner = "expipiplus1";
-      repo = "vector-sized";
-      rev = "5f8773ee029e61c461e457ab58bdcd1a8e4065e4";
-      sha256 = "1hafl49ggdb659p6sfhssanrn0pibwk804wpf6n19465zss64bna";
-    };
+    #vector-sized-src = pkgs.fetchFromGitHub {
+    #  owner = "expipiplus1";
+    #  repo = "vector-sized";
+    #  rev = "5f8773ee029e61c461e457ab58bdcd1a8e4065e4";
+    #  sha256 = "1hafl49ggdb659p6sfhssanrn0pibwk804wpf6n19465zss64bna";
+    #};
   in
   {
     clay = dontCheck super.clay;
@@ -45,7 +48,7 @@ project ./. ({ pkgs, hackGet, ... }: {
     beam-migrate = self.callCabal2nix "beam-migrate" (beam + /beam-migrate) {};
     beam-sqlite = self.callCabal2nix "beam-sqlite" (beam + /beam-sqlite) {};
     direct-sqlite = self.callCabal2nix "direct-sqlite" direct-sqlite-src {};
-    vector-sized = doJailbreak (self.callCabal2nix "vector-sized" vector-sized-src {});
+    # vector-sized = doJailbreak (self.callCabal2nix "vector-sized" vector-sized-src {});
     indexed-list-literals = doJailbreak super.indexed-list-literals;
     email-validate = doJailbreak super.email-validate;
     pagination = dontCheck super.pagination;

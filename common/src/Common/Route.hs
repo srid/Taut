@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
@@ -15,7 +16,6 @@ import Prelude hiding (id, (.))
 import Control.Category (Category (..))
 import Control.Monad.Except
 import Data.Functor.Identity
-import Data.Functor.Sum
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -55,22 +55,25 @@ data FrontendRoute :: * -> * where
   FrontendRoute_Home :: FrontendRoute ()
   FrontendRoute_Search :: FrontendRoute (PaginatedRoute UTCTime Text)
 
-backendRouteEncoder
-  :: Encoder (Either Text) Identity (R (Sum BackendRoute (ObeliskRoute FrontendRoute))) PageName
-backendRouteEncoder = handleEncoder (const (InL BackendRoute_Missing :/ ())) $
-  pathComponentEncoder $ \case
-    InL backendRoute -> case backendRoute of
+fullRouteEncoder
+  :: Encoder (Either Text) Identity (R (FullRoute BackendRoute FrontendRoute)) PageName
+fullRouteEncoder =
+  mkFullRouteEncoder
+    (FullRoute_Backend BackendRoute_Missing :/ ())
+    (\case
       BackendRoute_Missing -> PathSegment "missing" $ unitEncoder mempty
       BackendRoute_OAuth -> PathSegment "oauth" oauthRouteEncoder
       BackendRoute_GetSearchExamples -> PathSegment "get-search-examples" $ unitEncoder mempty
       BackendRoute_SearchMessages -> PathSegment "search-messages" $
         paginatedEncoder utcTimeEncoderImpl textEncoderImpl
-    InR obeliskRoute -> obeliskRouteSegment obeliskRoute $ \case
+    )
+    (\case
       -- The encoder given to PathEnd determines how to parse query parameters,
       -- in this example, we have none, so we insist on it.
       FrontendRoute_Home -> PathEnd $ unitEncoder mempty
       FrontendRoute_Search -> PathSegment "search" $
         paginatedEncoder utcTimeEncoderImpl textEncoderImpl
+    )
 
 -- TODO: compose instead of writing by hand
 paginatedEncoder
