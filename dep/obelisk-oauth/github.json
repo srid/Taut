@@ -1,7 +1,8 @@
 {
-  "owner": "obsidiansystems",
+  "owner": "srid",
   "repo": "obelisk-oauth",
-  "branch": "master",
-  "rev": "9de6db03cb737889efc14d38383cead8c1374750",
-  "sha256": "0yfnk5ay9bf4ca1my914vzgm812vi65n35vdialmvhigv5kdjx98"
+  "branch": "obelisk-0.8",
+  "private": false,
+  "rev": "392d2b53cf8baf95bd8490223e7e30a266ed505e",
+  "sha256": "1p7fa4b2azmaf0whv6b2vkci2xslbwwl6kg2gvwk56696njj23fs"
 }

@@ -7,49 +7,51 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
+
 module Backend.Search.Parser where
 
+import Common.Slack.Internal (parseSlackTimestamp)
 import Control.Monad
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time.Calendar
 import Data.Time.Clock
 import Data.Void
-import Text.Read (readMaybe)
 import GHC.Generics
-
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
-
-import Common.Slack.Internal (parseSlackTimestamp)
+import Text.Read (readMaybe)
 
 data SearchModifier
-  = SearchModifier_From Text  -- ^ Sent by person
-  | SearchModifier_In Text  -- ^ In channel
+  = -- | Sent by person
+    SearchModifier_From Text
+  | -- | In channel
+    SearchModifier_In Text
   | SearchModifier_During Day
-  | SearchModifier_At UTCTime  -- ^ At a specific message
+  | -- | At a specific message
+    SearchModifier_At UTCTime
   | SearchModifier_After Day
   | SearchModifier_Before Day
   | SearchModifier_HasPin
-  -- | HasLink
-  -- | HasEmoji EmojiCode
+  -- HasLink
+  -- HasEmoji EmojiCode
   deriving (Show, Generic)
 
-newtype SearchKeyword = SearchKeyword { unSearchKeyword :: Text }
+newtype SearchKeyword = SearchKeyword {unSearchKeyword :: Text}
   deriving (Show, Generic)
 
 type Parser = Parsec Void Text
 
 searchModifier :: Parser SearchModifier
 searchModifier =
-      try (SearchModifier_From <$> (attribute "from" >> someWord))
-  <|> try (SearchModifier_In <$> (attribute "in" >> someWord))
-  <|>     (SearchModifier_During <$> (try (attribute "during") >> dayParser))
-  <|>     (SearchModifier_At <$> (try (attribute "at") >> timeParser))
-  <|>     (SearchModifier_After <$> (try (attribute "after") >> dayParser))
-  <|>     (SearchModifier_Before <$> (try (attribute "before") >> dayParser))
-  <|> try (SearchModifier_HasPin <$ string "has:pin")
+  try (SearchModifier_From <$> (attribute "from" >> someWord))
+    <|> try (SearchModifier_In <$> (attribute "in" >> someWord))
+    <|> (SearchModifier_During <$> (try (attribute "during") >> dayParser))
+    <|> (SearchModifier_At <$> (try (attribute "at") >> timeParser))
+    <|> (SearchModifier_After <$> (try (attribute "after") >> dayParser))
+    <|> (SearchModifier_Before <$> (try (attribute "before") >> dayParser))
+    <|> try (SearchModifier_HasPin <$ string "has:pin")
 
 dayParser :: Parser Day
 dayParser = do
@@ -69,8 +71,8 @@ timeParser = do
 
 searchKeyword :: Parser SearchKeyword
 searchKeyword =
-      (SearchKeyword <$> quotedText)
-  <|> (SearchKeyword <$> someWord)
+  (SearchKeyword <$> quotedText)
+    <|> (SearchKeyword <$> someWord)
 
 quotedText :: Parser Text
 quotedText = do
@@ -86,7 +88,7 @@ someWord = T.pack <$> some (alphaNumChar <|> punctuationChar)
 attribute :: Text -> Parser ()
 attribute name = void $ string $ name <> ":"
 
-parseSearchQuery :: Text -> Either (ParseError Char Void) [Either SearchModifier SearchKeyword]
+parseSearchQuery :: Text -> Either (ParseErrorBundle Text Void) [Either SearchModifier SearchKeyword]
 parseSearchQuery q = runParser p "<user-query>" q
   where
     p = sepBy (Left <$> searchModifier <|> Right <$> searchKeyword) space1

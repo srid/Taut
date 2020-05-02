@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
@@ -8,50 +9,52 @@
 
 module Backend.Config where
 
-import Control.Monad.IO.Class
-import Data.Functor.Identity (Identity)
-import Data.Functor.Sum
-import Data.Text (Text)
-import qualified Data.Text as T
-import GHC.Natural (Natural)
-
-import qualified Database.SQLite.Simple as SQLite
-import Network.HTTP.Client
-import Network.HTTP.Client.TLS
-import Web.ClientSession
-
-import Obelisk.ExecutableConfig.Backend (HasBackendConfigs, getBackendConfig, getCommonConfig)
-import Obelisk.Route hiding (decode, encode)
-
 import Common.Route
 import Common.Slack.Types.Auth (SlackTeam (..))
+import Control.Monad.IO.Class
+import Data.Functor.Identity (Identity)
+import qualified Data.Map.Strict as Map
+import Data.Text (Text)
+import qualified Data.Text as T
+import Data.Text.Encoding (decodeUtf8)
+import qualified Database.SQLite.Simple as SQLite
+import GHC.Natural (Natural)
+import GHC.Stack
+import Network.HTTP.Client
+import Network.HTTP.Client.TLS
+import Obelisk.ExecutableConfig.Lookup
+import Obelisk.Route hiding (decode, encode)
+import Web.ClientSession
 
 data BackendConfig = BackendConfig
-  { _backendConfig_enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute FrontendRoute))) PageName
-  , _backendConfig_sessKey :: Key
-  , _backendConfig_tlsMgr :: Manager
-  , _backendConfig_sqliteConn :: SQLite.Connection
-  , _backendConfig_team :: SlackTeam
-  , _backendConfig_pageSize :: Natural
-  , _backendConfig_routeEnv :: Text
-  , _backendConfig_oauthClientID :: Text  -- TODO: invariant for oauth format?
-  , _backendConfig_oauthClientSecret :: Text
-  , _backendConfig_slackExportPath :: Text
+  { _backendConfig_enc :: Encoder Identity Identity (R (FullRoute BackendRoute FrontendRoute)) PageName,
+    _backendConfig_sessKey :: !Key,
+    _backendConfig_tlsMgr :: !Manager,
+    _backendConfig_sqliteConn :: !SQLite.Connection,
+    _backendConfig_team :: !SlackTeam,
+    _backendConfig_pageSize :: !Natural,
+    _backendConfig_routeEnv :: !Text,
+    _backendConfig_oauthClientID :: !Text, -- TODO: invariant for oauth format?
+    _backendConfig_oauthClientSecret :: !Text,
+    _backendConfig_slackExportPath :: !Text
   }
 
-readBackendConfig
-  :: (HasBackendConfigs m, MonadIO m)
-  => SQLite.Connection -> SlackTeam -> m BackendConfig
+readBackendConfig ::
+  (HasCallStack, MonadIO m) =>
+  SQLite.Connection ->
+  SlackTeam ->
+  m BackendConfig
 readBackendConfig conn team = do
-  Just route <- fmap T.strip <$> getCommonConfig "route"
-  Just oauthClientID <- fmap T.strip <$> getBackendConfig "oauthClientID"
-  Just oauthClientSecret <- fmap T.strip <$> getBackendConfig "oauthClientSecret"
-  Just slackExportPath <- getSlackExportPath
+  configs <- liftIO $ getConfigs
+  let Just route = decodeUtf8 <$> Map.lookup "common/route" configs
+  let Just oauthClientID = T.strip . decodeUtf8 <$> Map.lookup "backend/oauthClientID" configs
+  let Just oauthClientSecret = T.strip . decodeUtf8 <$> Map.lookup "backend/oauthClientSecret" configs
+  let Just slackExportPath = T.strip . decodeUtf8 <$> Map.lookup "backend/slackExportPath" configs
   k <- snd <$> liftIO randomKey
   tlsMgr <- liftIO newTlsManager
   pure $ BackendConfig enc k tlsMgr conn team defaultPageSize route oauthClientID oauthClientSecret slackExportPath
   where
-    Right (enc :: Encoder Identity Identity (R (Sum BackendRoute (ObeliskRoute FrontendRoute))) PageName) = checkEncoder backendRouteEncoder
+    Right (enc :: Encoder Identity Identity (R (FullRoute BackendRoute FrontendRoute)) PageName) = checkEncoder fullRouteEncoder
     -- WARNING: Changing the default page size will invalidate existing message
     -- permalinks (which contain page index embedded in them).
     --
@@ -59,6 +62,3 @@ readBackendConfig conn team = do
     -- ?afterTs or some such thing, while making sure frontend page navigation
     -- is still possible.
     defaultPageSize = 30
-
-getSlackExportPath :: HasBackendConfigs m => m (Maybe Text)
-getSlackExportPath = fmap T.strip <$> getBackendConfig "slackExportPath"
