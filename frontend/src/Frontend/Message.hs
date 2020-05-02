@@ -5,78 +5,68 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
+
 module Frontend.Message where
-
-import Control.Monad
-import Data.Bool (bool)
-import Data.Functor.Identity
-import Data.Maybe
-import Data.Monoid (First (..))
-import Data.Text (Text)
-import qualified Data.Text as T
-import Data.Time.Calendar
-import Data.Time.Clock
-import Text.Printf (printf)
-
-import Obelisk.Route.Frontend
-import Reflex.Dom.Core
-
-import Data.Pagination
 
 import Common.Route
 import Common.Slack.Internal (formatSlackTimestamp)
 import Common.Slack.Types
 import Common.Types
+import Control.Monad
+import Data.Bool (bool)
+import Data.Functor.Identity
+import Data.Maybe
+import Data.Monoid (First (..))
+import Data.Pagination
+import Data.Text (Text)
+import qualified Data.Text as T
+import Data.Time.Calendar
+import Data.Time.Clock
+import Obelisk.Route.Frontend
+import Reflex.Dom.Core
+import Text.Printf (printf)
 
-messageList
-  :: ( DomBuilder t m
-     , Prerender js t m
-     , SetRoute t (R FrontendRoute) m
-     , RouteToUrl (R FrontendRoute) m
-     )
-  => Maybe UTCTime
-  -> Paginated Message
-  -> m (Dynamic t (Maybe (Element EventResult GhcjsDomSpace t)))
-  -- ^ The element that the caller should scroll to.
+messageList ::
+  ( DomBuilder t m,
+    Prerender js t m,
+    SetRoute t (R FrontendRoute) m,
+    RouteToUrl (R FrontendRoute) m
+  ) =>
+  Maybe UTCTime ->
+  Paginated Message ->
+  -- | The element that the caller should scroll to.
+  m (Dynamic t (Maybe (Element EventResult GhcjsDomSpace t)))
 messageList toHighlight pm
   | msgs == [] = text "No results" >> pure (constDyn Nothing)
   | otherwise = divClass "ui comments" $ do
-      fmap (fmap getFirst . mconcat) $ forM msgs $ \msg -> do
-        let highlight = toHighlight == Just (_messageTs msg)
-        bookmark <- if highlight
+    fmap (fmap getFirst . mconcat) $ forM msgs $ \msg -> do
+      let highlight = toHighlight == Just (_messageTs msg)
+      bookmark <-
+        if highlight
           then bookmarkElement
           else pure $ constDyn Nothing
-        singleMessage highlight msg
-        pure $ fmap First bookmark
+      singleMessage highlight msg
+      pure $ fmap First bookmark
   where
     msgs = filter hasChannel $ paginatedItems pm
-
     hasChannel = isJust . _messageChannelName
-
-    -- | Create an invisible HTML element that can later be used with JavaScript.
-    --
-    -- This has to be run inside prerender due to the GhcjsDomSpace constraint
-    -- that is required when running JavaScript on the created element.
-    --
-    -- A typical use case for this function is to mark a location in DOM to
-    -- scroll to after build.
-    bookmarkElement
-      :: ( DomBuilder t m
-         , Prerender js t m
-         )
-      => m (Dynamic t (Maybe (Element EventResult GhcjsDomSpace t)))
+    bookmarkElement ::
+      ( DomBuilder t m,
+        Prerender js t m
+      ) =>
+      m (Dynamic t (Maybe (Element EventResult GhcjsDomSpace t)))
     bookmarkElement = prerender (pure Nothing) $ do
       fmap (Just . fst) $ el' "div" blank
 
-singleMessage
-  :: ( DomBuilder t m
-     , SetRoute t (R FrontendRoute) m
-     , RouteToUrl (R FrontendRoute) m
-     , Prerender js t m
-     )
-  => Bool
-  -> Message
-  -> m ()
+singleMessage ::
+  ( DomBuilder t m,
+    SetRoute t (R FrontendRoute) m,
+    RouteToUrl (R FrontendRoute) m,
+    Prerender js t m
+  ) =>
+  Bool ->
+  Message ->
+  m ()
 singleMessage highlight msg = do
   let mts = formatSlackTimestamp (_messageTs msg)
   elAttr "div" ("class" =: "comment" <> "id" =: mts) $ bool id (elAttr "div" ("style" =: "background-color: PapayaWhip;")) highlight $ do
@@ -84,8 +74,11 @@ singleMessage highlight msg = do
       elClass "a" "author" $ do
         text $ fromMaybe "?unknown?" $ _messageUserName msg
       divClass "metadata" $ do
-        divClass "room" $
-          text $ fromMaybe "Unknown Channel" $ fmap ("#" <>) $ _messageChannelName msg
+        divClass "room"
+          $ text
+          $ fromMaybe "Unknown Channel"
+          $ fmap ("#" <>)
+          $ _messageChannelName msg
         divClass "date" $ do
           case _messageChannelName msg of
             Nothing -> text $ T.pack $ show $ _messageTs msg
@@ -104,17 +97,17 @@ renderSlackMessage s = renderChunks $ T.splitOn "\n" s'
   where
     s' = T.replace "&gt;" ">" s
     renderChunks [] = blank
-    renderChunks chunk@(c:cs) = do
+    renderChunks chunk@(c : cs) = do
       -- Blockquote all chunks if >>> is prefix.
-      if | T.isPrefixOf ">>>" c -> forM_ chunk $ el "blockquote" . text
-         | T.isPrefixOf ">" c -> el "blockquote" (text c) >> renderChunks cs
-         | otherwise -> el "p" (text c) >> renderChunks cs
+      if  | T.isPrefixOf ">>>" c -> forM_ chunk $ el "blockquote" . text
+          | T.isPrefixOf ">" c -> el "blockquote" (text c) >> renderChunks cs
+          | otherwise -> el "p" (text c) >> renderChunks cs
 
-getMessages
-  :: (Reflex t, MonadHold t m, PostBuild t m, DomBuilder t m, Prerender js t m)
-  => Dynamic t r
-  -> (r -> R BackendRoute)
-  -> m (Event t (Maybe MessagesResponse))
+getMessages ::
+  (Reflex t, MonadHold t m, PostBuild t m, DomBuilder t m, Prerender js t m) =>
+  Dynamic t r ->
+  (r -> R BackendRoute) ->
+  m (Event t (Maybe MessagesResponse))
 getMessages dr mkUrl = switchHold never <=< dyn $ ffor dr $ \r -> do
   fmap switchDyn $ prerender (pure never) $ do
     pb <- getPostBuild
@@ -122,9 +115,9 @@ getMessages dr mkUrl = switchHold never <=< dyn $ ffor dr $ \r -> do
   where
     Right (enc :: Encoder Identity Identity (R (FullRoute BackendRoute FrontendRoute)) PageName) = checkEncoder fullRouteEncoder
 
-getSearchExamples
-  :: (MonadHold t m, PostBuild t m, Prerender js t m)
-  => m (Event t (Maybe ExamplesResponse))
+getSearchExamples ::
+  (MonadHold t m, PostBuild t m, Prerender js t m) =>
+  m (Event t (Maybe ExamplesResponse))
 getSearchExamples = do
   fmap switchDyn $ prerender (pure never) $ do
     pb <- getPostBuild

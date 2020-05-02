@@ -7,6 +7,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
+
 module Common.Slack.Types.Search where
 
 import Control.Lens hiding ((<.))
@@ -20,14 +21,14 @@ import Data.Time.Clock
 import GHC.Generics
 
 data MessageFilters = MessageFilters
-  { _messageFilters_terms :: [Text]
-  , _messageFilters_from :: [Text]
-  , _messageFilters_in :: [Text]
-  , _messageFilters_during :: [Day]
-  , _messageFilters_after :: Maybe Day
-  , _messageFilters_before :: Maybe Day
-  , _messageFilters_at :: Maybe UTCTime
-  , _messageFilters_hasPin :: Maybe ()
+  { _messageFilters_terms :: [Text],
+    _messageFilters_from :: [Text],
+    _messageFilters_in :: [Text],
+    _messageFilters_during :: [Day],
+    _messageFilters_after :: Maybe Day,
+    _messageFilters_before :: Maybe Day,
+    _messageFilters_at :: Maybe UTCTime,
+    _messageFilters_hasPin :: Maybe ()
   }
   deriving (Eq, Show, Generic)
 
@@ -37,6 +38,7 @@ instance Default MessageFilters where
   def = MessageFilters [] [] [] [] Nothing Nothing Nothing Nothing
 
 instance FromJSON MessageFilters
+
 instance ToJSON MessageFilters
 
 isOnlyDuring :: MessageFilters -> Maybe Day

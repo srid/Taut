@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+
 module Common.Slack.Internal where
 
 import Data.Aeson
@@ -12,9 +13,10 @@ import Text.Read (readMaybe)
 
 -- | Field label modifier for converting Slack datatypes to json
 fieldLabelMod :: Options
-fieldLabelMod = defaultOptions
-  { fieldLabelModifier = toQuietSnake . fromHumps . dropWhile (not . isUpper)
-  }
+fieldLabelMod =
+  defaultOptions
+    { fieldLabelModifier = toQuietSnake . fromHumps . dropWhile (not . isUpper)
+    }
 
 parseSlackTimestamp :: Monad f => Text -> f UTCTime
 parseSlackTimestamp ts' = case readMaybe (T.unpack ts') of
