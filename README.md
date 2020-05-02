@@ -1,16 +1,18 @@
 # Taut
 
-An ambitious [Slack export data](https://get.slack.help/hc/en-us/articles/201658943-Export-your-workspace-data) viewer.
+An ambitious [Slack export
+data](https://get.slack.help/hc/en-us/articles/201658943-Export-your-workspace-data)
+viewer written in Haskell.
 
-Taut is currently being used to access and search about 50,000 messages in a
+Taut is currently being used to access and search over 50,000 messages in a
 Slack community I help manage, and is now ready for general use.
 
 ## Features
 
-- [X] Read directly from the Slack export data zip archive
-- [X] Access _all_ messages, and search them as you would on Slack.
-- [X] Every message comes with its own permalink
-- [X] Only accessible to the organization's members (uses Slack's login)
+- Read directly from the Slack export data zip archive
+- Access _all_ messages, and search them as you would on Slack.
+- Every message comes with its own permalink
+- Only accessible to the organization's members (uses Slack's login)
 
 ## Running locally
 
