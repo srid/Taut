@@ -24,11 +24,11 @@ project ./. ({ pkgs, hackGet, ... }: {
       rev = "8e3da41c46b5de19942cc7bf421c3deb5117ba7a";
       sha256 = "0ffk5j1db2y1drn0przh4jw9gc3vygwd987wl1g1m3dw7ry4dxy6";
     };
-    obelisk-oauth-common = obelisk-oauth + "/common";
-    obelisk-oauth-backend = obelisk-oauth + "/backend";
-    beam-core = beam + /beam-core;
-    beam-migrate = beam + /beam-migrate;
-    beam-sqlite = beam + /beam-sqlite;
+    obelisk-oauth-common = "${obelisk-oauth}/common";
+    obelisk-oauth-backend = "${obelisk-oauth}/backend";
+    beam-core = "${beam}/beam-core";
+    beam-migrate = "${beam}/beam-migrate";
+    beam-sqlite = "${beam}/beam-sqlite";
     pagination = hackGet ./dep/pagination; # https://github.com/mrkkrp/pagination/issues/6
   };
 

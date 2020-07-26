@@ -2,6 +2,7 @@
   "owner": "tathougies",
   "repo": "beam",
   "branch": "master",
-  "rev": "35af9be269e98629d28fbae4eceb850943fd4b01",
-  "sha256": "0srmscfcsq4ygh816yd5fvmx9db9pg2kgpfa072a0y4widrkv4j9"
+  "private": false,
+  "rev": "c858846e322ad28fe53fb6c56006bb1a52b20683",
+  "sha256": "1xffrdbfs2d61qwlchqj4pc5yczkipbghhr5566p2bn1163mmyqw"
 }
