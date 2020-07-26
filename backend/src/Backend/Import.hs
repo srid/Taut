@@ -76,12 +76,14 @@ populateDatabase conn archivePath = do
     forM_ schema $ SQLite.execute_ conn
     -- Load JSON data
     runBeamSqlite conn $ do
-      runInsert
-        $ insert (_slackUsers slackDb)
-        $ insertValues users
-      runInsert
-        $ insert (_slackChannels slackDb)
-        $ insertValues channels
+      forM_ (chunksOf 100 users) $ \chunk -> do
+        runInsert
+          $ insert (_slackUsers slackDb)
+          $ insertValues chunk
+      forM_ (chunksOf 100 channels) $ \chunk -> do
+        runInsert
+          $ insert (_slackChannels slackDb)
+          $ insertValues chunk
       forM_ (chunksOf 100 messages) $ \chunk -> do
         runInsert
           $ insert (_slackMessages slackDb)
