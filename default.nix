@@ -7,6 +7,7 @@ project ./. ({ pkgs, hackGet, ... }: {
   android.displayName = "Taut";
   ios.bundleIdentifier = "ca.srid.Taut";
   ios.bundleName = "Taut";
+  __withGhcide = true;
 
   packages = let
     obelisk-oauth = hackGet ./dep/obelisk-oauth;
