@@ -33,6 +33,7 @@ library
                , obelisk-oauth-backend
                , obelisk-oauth-common
                , obelisk-route
+               , obelisk-executable-config-lookup
                , pagination
                , profunctors
                , reflex-dom-core
@@ -86,6 +87,7 @@ executable backend
                , obelisk-oauth-backend
                , obelisk-oauth-common
                , obelisk-route
+               , obelisk-executable-config-lookup
                , pagination
                , profunctors
                , reflex-dom-core
