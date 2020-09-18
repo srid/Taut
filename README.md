@@ -4,8 +4,7 @@ An ambitious [Slack export
 data](https://get.slack.help/hc/en-us/articles/201658943-Export-your-workspace-data)
 viewer written in Haskell.
 
-Taut is currently being used to access and search over 50,000 messages in a
-Slack community I help manage, and is now ready for general use.
+Taut was used to access and search over 50,000 messages in a Slack community I helped manage (we have migrated to Zulip), and is now ready for general use.
 
 ## Features
 
